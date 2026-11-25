@@ -22,7 +22,7 @@ export async function streamQuickQuestion(
 ): Promise<ReadableStream<Uint8Array>> {
   const context = assertRuntimeCompatibleTarget(assertRunnableSession(input.sessionId))
   const runtimeKind = context.session.runtimeKind ?? 'standard'
-  const runtime = getRuntimeRegistry().get(runtimeKind)
+  const runtime = await getRuntimeRegistry().require(runtimeKind)
 
   if (!runtime) {
     throw new AppError({

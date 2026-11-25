@@ -340,7 +340,7 @@ const sideChatDeps: CreateSideChatDeps = {
       assertRuntimeCompatibleTarget(assertRunnableSession(parentSessionId), providerTargetId),
       'Side conversation',
     ),
-  getRuntime: runtimeKind => getRuntimeRegistry().get(runtimeKind),
+  getRuntime: runtimeKind => getRuntimeRegistry().require(runtimeKind),
   getActiveParentRuntimeSession: (parentSessionId): ActiveParentRuntimeSession | undefined => {
     const activeRunId = runRegistry.getActiveRunIdForSession(parentSessionId)
     const activeRun = activeRunId ? runRegistry.getActiveRun(activeRunId) : undefined
@@ -400,7 +400,7 @@ const runtimeGoalContinuationDeps: RuntimeGoalContinuationSchedulerDeps = {
   pendingQueueItemCount: sessionId => listPendingQueueRows(sessionId).length,
   scheduleQueueDrain: sessionId => scheduleSessionQueueDrain(sessionId, queueDrainDeps),
   readRuntimeBinding: readDurableProviderRuntimeBinding,
-  readRuntime: runtimeKind => getRuntimeRegistry().get(runtimeKind),
+  readRuntime: runtimeKind => getRuntimeRegistry().require(runtimeKind),
   isProviderTargetAvailable: providerTargetId => isProviderTargetAvailable(providerTargetId),
   createContinuationRun: async (input) => {
     await createRun({

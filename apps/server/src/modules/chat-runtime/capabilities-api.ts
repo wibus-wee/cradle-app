@@ -51,7 +51,7 @@ export async function getCapabilities(
 
   const registry = getRuntimeRegistry()
   const runtimeKind = context.session.runtimeKind ?? 'standard'
-  const runtime = registry.get(runtimeKind)
+  const runtime = await registry.require(runtimeKind)
   if (!runtime) {
     throw new AppError({
       code: 'chat_runtime_not_available',
@@ -119,7 +119,7 @@ export async function getUiSlotStates(
 
   const registry = getRuntimeRegistry()
   const runtimeKind = context.session.runtimeKind ?? 'standard'
-  const runtime = registry.get(runtimeKind)
+  const runtime = await registry.require(runtimeKind)
   if (!runtime) {
     throw new AppError({
       code: 'chat_runtime_not_available',
@@ -272,7 +272,7 @@ export async function readWorkflowArtifactSource(sessionId: string, toolCallId: 
 
   const activeRunId = runRegistry.getActiveRunIdForSession(sessionId)
   const activeRun = activeRunId ? runRegistry.getActiveRun(activeRunId) : undefined
-  const runtime = getRuntimeRegistry().get(runtimeKind)
+  const runtime = await getRuntimeRegistry().require(runtimeKind)
   const resolved = activeRun?.runtimeSession.runtimeKind === runtimeKind
     ? { runtimeSession: activeRun.runtimeSession }
     : runtime

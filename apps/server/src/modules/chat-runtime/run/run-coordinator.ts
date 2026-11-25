@@ -162,7 +162,7 @@ export async function createRun(
 
     const registry = getRuntimeRegistry()
     const runtimeKind: RuntimeKind = context.session.runtimeKind ?? 'standard'
-    const runtime = registry.get(runtimeKind)
+    const runtime = await registry.require(runtimeKind)
     if (!runtime) {
       throw new AppError({
         code: 'chat_runtime_not_available',

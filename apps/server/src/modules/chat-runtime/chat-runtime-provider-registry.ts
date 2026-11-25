@@ -3,15 +3,13 @@ import path from 'node:path'
 
 import { createChildLogger } from '../../logging/logger'
 import { getPluginSkillProjectionSources, getPluginSkillRegistryVersion } from '../../plugins/skill-registry'
-import { createAcpProvider } from '../chat-runtime-providers/acp/provider'
-import { createClaudeAgentProvider } from '../chat-runtime-providers/claude-agent/provider'
-import { createCodexProvider } from '../chat-runtime-providers/codex/provider'
-import { reconcileCodexSessionUsage } from '../chat-runtime-providers/codex/usage-reconciliation'
-import { createKimiProvider } from '../chat-runtime-providers/kimi/provider'
-import { createMockClaudeAgentProvider } from '../chat-runtime-providers/mock-claude-agent/provider'
-import { createStandardProvider } from '../chat-runtime-providers/openai-compatible/provider'
-import { createOpencodeProvider } from '../chat-runtime-providers/opencode/provider'
-import { createSystemAgentProvider } from '../chat-runtime-providers/system-agent/provider'
+import { ACP_RUNTIME_KIND, ACP_RUNTIME_METADATA } from '../chat-runtime-providers/acp/metadata'
+import { CLAUDE_AGENT_RUNTIME_KIND, CLAUDE_AGENT_RUNTIME_METADATA } from '../chat-runtime-providers/claude-agent/metadata'
+import { CODEX_RUNTIME_KIND, CODEX_RUNTIME_METADATA } from '../chat-runtime-providers/codex/metadata'
+import { KIMI_RUNTIME_KIND, KIMI_RUNTIME_METADATA } from '../chat-runtime-providers/kimi/metadata'
+import { STANDARD_RUNTIME_KIND, STANDARD_RUNTIME_METADATA } from '../chat-runtime-providers/openai-compatible/metadata'
+import { OPENCODE_RUNTIME_KIND, OPENCODE_RUNTIME_METADATA } from '../chat-runtime-providers/opencode/metadata'
+import { SYSTEM_AGENT_RUNTIME_KIND, SYSTEM_AGENT_RUNTIME_METADATA } from '../chat-runtime-providers/system-agent/metadata'
 import * as ModelRegistry from '../model-registry/service'
 import { record as recordObservability } from '../observability/service'
 import * as Preferences from '../preferences/service'
@@ -55,44 +53,159 @@ interface SkillPathCacheEntry {
   pluginSkillRegistryVersion: number
 }
 
-export class RuntimeRegistry {
-  private readonly runtimes = new Map<RuntimeKind, {
-    runtime: ChatRuntime
-    metadata: ChatRuntimeMetadata
-    pluginOwner: string | null
-  }>()
+interface RuntimeEntry {
+  runtime: ChatRuntime | null
+  loadRuntime: (() => Promise<ChatRuntime>) | null
+  runtimePromise: Promise<ChatRuntime> | null
+  metadata: ChatRuntimeMetadata
+  pluginOwner: string | null
+}
 
+export class RuntimeRegistry {
+  private readonly runtimes = new Map<RuntimeKind, RuntimeEntry>()
+
+  /**
+   * Register an eager runtime instance. Plugin runtimes always use this path —
+   * they are already loaded by definition when their host plugin activates.
+   */
   register(runtime: ChatRuntime, metadata?: ChatRuntimeMetadata, pluginOwner: string | null = null): void {
-    assertChatRuntime(runtime)
-    if (pluginOwner !== null && CATALOG_ONLY_BUILTIN_RUNTIME_KINDS.has(runtime.runtimeKind)) {
-      throw new Error(`Runtime ${runtime.runtimeKind} is reserved by builtin catalog metadata.`)
-    }
-    const existing = this.runtimes.get(runtime.runtimeKind)
-    const resolvedMetadata = metadata ?? runtime.metadata ?? existing?.metadata
-    if (!resolvedMetadata) {
-      throw new Error(`Runtime ${runtime.runtimeKind} must declare catalog metadata.`)
-    }
-    if (existing && (existing.pluginOwner !== null || pluginOwner !== null)) {
-      throw new Error(`Runtime ${runtime.runtimeKind} is already registered by ${existing.pluginOwner ?? 'builtin'}.`)
-    }
-    this.runtimes.set(runtime.runtimeKind, {
+    this.registerEntry(runtime.runtimeKind, {
       runtime,
-      metadata: normalizeRuntimeMetadata(resolvedMetadata),
+      loadRuntime: null,
+      runtimePromise: null,
+      metadata: metadata ?? runtime.metadata,
       pluginOwner,
     })
-    registerRuntimeProviderKinds(runtime.runtimeKind, resolvedMetadata.providerKinds)
-    registerRuntimeProviderBinding(runtime.runtimeKind, resolvedMetadata.providerBinding ?? 'required')
-    registerRuntimeSessionLaunchMode(runtime.runtimeKind, resolvedMetadata.sessionLaunchMode ?? 'runtime-provider')
-    registerRuntimeGoalContinuationReader(runtime.runtimeKind, runtime.goalContinuation)
-    registerRuntimeOwnedProviderTargets(runtime.runtimeKind, runtime.ownedProviderTargets)
   }
 
+  /**
+   * Register a builtin runtime whose implementation module loads on first use.
+   * The metadata stays eager — catalog listing, provider-kind compatibility,
+   * and capability advertisement must not pay the implementation cost. The
+   * factory runs at most once; the result is cached like an eager runtime.
+   */
+  registerLazy(
+    runtimeKind: RuntimeKind,
+    metadata: ChatRuntimeMetadata,
+    loadRuntime: () => Promise<ChatRuntime>,
+  ): void {
+    this.registerEntry(runtimeKind, {
+      runtime: null,
+      loadRuntime,
+      runtimePromise: null,
+      metadata,
+      pluginOwner: null,
+    })
+  }
+
+  private registerEntry(
+    runtimeKind: RuntimeKind,
+    input: {
+      runtime: ChatRuntime | null
+      loadRuntime: (() => Promise<ChatRuntime>) | null
+      runtimePromise: Promise<ChatRuntime> | null
+      metadata: ChatRuntimeMetadata | undefined
+      pluginOwner: string | null
+    },
+  ): void {
+    if (input.runtime) {
+      assertChatRuntime(input.runtime)
+    }
+    if (input.pluginOwner !== null && CATALOG_ONLY_BUILTIN_RUNTIME_KINDS.has(runtimeKind)) {
+      throw new Error(`Runtime ${runtimeKind} is reserved by builtin catalog metadata.`)
+    }
+    const existing = this.runtimes.get(runtimeKind)
+    const resolvedMetadata = input.metadata ?? input.runtime?.metadata ?? existing?.metadata
+    if (!resolvedMetadata) {
+      throw new Error(`Runtime ${runtimeKind} must declare catalog metadata.`)
+    }
+    if (existing && (existing.pluginOwner !== null || input.pluginOwner !== null)) {
+      throw new Error(`Runtime ${runtimeKind} is already registered by ${existing.pluginOwner ?? 'builtin'}.`)
+    }
+    this.runtimes.set(runtimeKind, {
+      runtime: input.runtime,
+      loadRuntime: input.loadRuntime,
+      runtimePromise: input.runtimePromise,
+      metadata: normalizeRuntimeMetadata(resolvedMetadata),
+      pluginOwner: input.pluginOwner,
+    })
+    registerRuntimeProviderKinds(runtimeKind, resolvedMetadata.providerKinds)
+    registerRuntimeProviderBinding(runtimeKind, resolvedMetadata.providerBinding ?? 'required')
+    registerRuntimeSessionLaunchMode(runtimeKind, resolvedMetadata.sessionLaunchMode ?? 'runtime-provider')
+    if (input.runtime) {
+      this.publishRuntimeDerivedHooks(runtimeKind, input.runtime)
+    }
+  }
+
+  /**
+   * Hooks derived from the runtime instance (goal continuation, owned provider
+   * targets) become visible only once the implementation has loaded — before
+   * first use there is no live state for them to project, so absence is
+   * semantically correct, not a degradation.
+   */
+  private publishRuntimeDerivedHooks(runtimeKind: RuntimeKind, runtime: ChatRuntime): void {
+    registerRuntimeGoalContinuationReader(runtimeKind, runtime.goalContinuation)
+    registerRuntimeOwnedProviderTargets(runtimeKind, runtime.ownedProviderTargets)
+  }
+
+  private async materialize(entry: RuntimeEntry, runtimeKind: RuntimeKind): Promise<ChatRuntime | undefined> {
+    if (entry.runtime) {
+      return entry.runtime
+    }
+    if (!entry.loadRuntime) {
+      return undefined
+    }
+    entry.runtimePromise ??= entry.loadRuntime().then((runtime) => {
+      assertChatRuntime(runtime)
+      entry.runtime = runtime
+      this.publishRuntimeDerivedHooks(runtimeKind, runtime)
+      return runtime
+    })
+    return await entry.runtimePromise
+  }
+
+  /**
+   * Read an already-materialized runtime without triggering a load. Returns
+   * undefined both for unknown kinds and for lazy runtimes that have not been
+   * used yet — callers that cannot tolerate absence must use {@link require}.
+   */
+  peek(runtimeKind: RuntimeKind): ChatRuntime | undefined {
+    return this.runtimes.get(runtimeKind)?.runtime ?? undefined
+  }
+
+  /**
+   * Metadata lookup that never triggers implementation loading. Use this for
+   * provider-binding/providerKinds decisions — they are static catalog facts,
+   * not implementation behavior.
+   */
+  metadata(runtimeKind: RuntimeKind): ChatRuntimeMetadata | undefined {
+    return this.runtimes.get(runtimeKind)?.metadata
+  }
+
+  /** Load-on-first-use accessor for runtime implementations. */
+  async require(runtimeKind: RuntimeKind): Promise<ChatRuntime | undefined> {
+    const entry = this.runtimes.get(runtimeKind)
+    if (!entry) {
+      return undefined
+    }
+    return await this.materialize(entry, runtimeKind)
+  }
+
+  /**
+   * Synchronous accessor kept for legacy call sites. Returns only runtimes
+   * that are already materialized (eager plugins or previously used builtins).
+   * New code should use {@link require}; sync callers that need guaranteed
+   * presence must migrate.
+   */
   get(runtimeKind: RuntimeKind): ChatRuntime | undefined {
-    return this.runtimes.get(runtimeKind)?.runtime
+    return this.peek(runtimeKind)
   }
 
   async disposeAll(): Promise<void> {
     for (const entry of this.runtimes.values()) {
+      if (!entry.runtime) {
+        continue
+      }
       try {
         await entry.runtime.dispose?.()
       }
@@ -122,7 +235,11 @@ export class RuntimeRegistry {
       createRuntimeCatalogItem({
         runtimeKind,
         metadata: entry.metadata,
-        capabilities: cloneRuntimeCapabilities(entry.runtime.capabilities),
+        // Capabilities are static metadata: lazy runtimes advertise them from
+        // their eager metadata before first use, exactly like loaded ones.
+        capabilities: entry.runtime
+          ? cloneRuntimeCapabilities(entry.runtime.capabilities)
+          : cloneRuntimeCapabilities(capabilitiesFromMetadata(entry.metadata)),
         source: entry.pluginOwner ? 'plugin' as const : 'builtin' as const,
         pluginOwner: entry.pluginOwner,
       }))
@@ -147,7 +264,10 @@ export class RuntimeRegistry {
   async listDescriptors(): Promise<ChatRuntimeCatalogItem[]> {
     const items = this.list().filter(item => item.runtimeKind !== 'standard')
     const enriched = await Promise.all(items.map(async (item) => {
-      const runtime = this.runtimes.get(item.runtimeKind)?.runtime
+      const entry = this.runtimes.get(item.runtimeKind)
+      // Descriptor enrichment needs implementation code; load on demand. This
+      // endpoint is a settings/catalog surface, not the hot path.
+      const runtime = entry ? await this.materialize(entry, item.runtimeKind) : undefined
       if (!runtime?.getDraftPresentation) {
         return item
       }
@@ -169,10 +289,11 @@ export class RuntimeRegistry {
         runtimeKind,
         source: entry.pluginOwner ? 'plugin' as const : 'builtin' as const,
         pluginOwner: entry.pluginOwner,
-        hasHealthCheck: typeof entry.runtime.healthCheck === 'function',
+        hasHealthCheck: true,
       }
 
-      if (!entry.runtime.healthCheck) {
+      const runtime = await this.materialize(entry, runtimeKind)
+      if (!runtime?.healthCheck) {
         return {
           ...base,
           status: 'unknown' as const,
@@ -183,7 +304,7 @@ export class RuntimeRegistry {
 
       const startedAt = Date.now()
       try {
-        const status = await entry.runtime.healthCheck()
+        const status = await runtime.healthCheck()
         return normalizeRuntimeHealthItem(base, status, Date.now() - startedAt)
       }
       catch (error) {
@@ -304,6 +425,28 @@ function normalizeRuntimeMetadata(metadata: ChatRuntimeMetadata): ChatRuntimeMet
 
 function cloneRuntimeCapabilities(capabilities: ChatRuntimeCapabilities): ChatRuntimeCapabilities {
   return { ...capabilities }
+}
+
+/**
+ * Static capabilities advertised for a runtime whose implementation has not
+ * loaded yet. Metadata is required to carry them for lazy runtimes; the
+ * fallback zero-value exists only so a misregistered runtime fails the
+ * catalog honestly instead of crashing listing.
+ */
+function capabilitiesFromMetadata(metadata: ChatRuntimeMetadata): ChatRuntimeCapabilities {
+  if (metadata.capabilities) {
+    return cloneRuntimeCapabilities(metadata.capabilities)
+  }
+  return {
+    steer: 'unsupported',
+    supportsShellExecution: false,
+    supportsLastTurnRollback: false,
+    supportsRuntimeSettings: false,
+    supportsUiSlotStates: false,
+    supportsDynamicCapabilities: false,
+    supportsTitleGeneration: false,
+    sessionModelSwitch: 'unsupported',
+  }
 }
 
 export function assertChatRuntime(runtime: unknown): asserts runtime is ChatRuntime {
@@ -477,51 +620,93 @@ function createProviderContext(): ProviderContext {
   }
 }
 
+async function loadAcpProvider(ctx: ProviderContext): Promise<ChatRuntime> {
+  const { createAcpProvider } = await import('../chat-runtime-providers/acp/provider')
+  return createAcpProvider(ctx)
+}
+
+async function loadStandardProvider(ctx: ProviderContext): Promise<ChatRuntime> {
+  const { createStandardProvider } = await import('../chat-runtime-providers/openai-compatible/provider')
+  return createStandardProvider(ctx)
+}
+
+async function loadOpencodeProvider(ctx: ProviderContext): Promise<ChatRuntime> {
+  const { createOpencodeProvider } = await import('../chat-runtime-providers/opencode/provider')
+  return createOpencodeProvider(ctx)
+}
+
+async function loadClaudeAgentProvider(ctx: ProviderContext): Promise<ChatRuntime> {
+  if (process.env.CRADLE_MOCK_LLM_URL) {
+    const { createMockClaudeAgentProvider } = await import('../chat-runtime-providers/mock-claude-agent/provider')
+    return createMockClaudeAgentProvider(ctx)
+  }
+  const { createClaudeAgentProvider } = await import('../chat-runtime-providers/claude-agent/provider')
+  return createClaudeAgentProvider(ctx)
+}
+
+async function loadCodexProvider(ctx: ProviderContext): Promise<ChatRuntime> {
+  const [{ createCodexProvider }, { reconcileCodexSessionUsage }] = await Promise.all([
+    import('../chat-runtime-providers/codex/provider'),
+    import('../chat-runtime-providers/codex/usage-reconciliation'),
+  ])
+  return createCodexProvider(ctx, {
+    readCodexPreferences: () => Preferences.getCodexPreferencesSync(),
+    readCodexCliCompatibleIdentity: () => Preferences.isAppFeatureFlagEnabled('codexCliCompatibleIdentity'),
+    readChatPreferences: () => Preferences.getChatPreferencesSync(),
+    reconcileUsage: async (input) => {
+      await reconcileCodexSessionUsage(input)
+    },
+    resolveProviderTargetProfile: (providerTargetId) => {
+      const target = resolveProviderTargetForRuntime(providerTargetId, 'codex')
+      if (!target.enabled) {
+        return null
+      }
+      const config = JSON.parse(target.configJson) as Record<string, unknown>
+      return {
+        id: target.id,
+        name: target.label,
+        providerKind: target.providerKind,
+        enabled: target.enabled,
+        configJson: JSON.stringify({
+          ...config,
+          modelRegistryMappings: ModelRegistry.listMappingEntries(),
+        }),
+        credentialRef: target.credentialRef,
+        customModels: target.customModelsJson,
+        iconSlug: target.iconSlug,
+        providerTargetKind: target.kind,
+        providerTargetId: target.id,
+      }
+    },
+  })
+}
+
+async function loadKimiProvider(ctx: ProviderContext): Promise<ChatRuntime> {
+  const { createKimiProvider } = await import('../chat-runtime-providers/kimi/provider')
+  return createKimiProvider(ctx)
+}
+
+async function loadSystemAgentProvider(ctx: ProviderContext): Promise<ChatRuntime> {
+  const { createSystemAgentProvider } = await import('../chat-runtime-providers/system-agent/provider')
+  return createSystemAgentProvider(ctx)
+}
+
 export function getRuntimeRegistry(): RuntimeRegistry {
   if (!registry) {
     registry = new RuntimeRegistry()
     const ctx = createProviderContext()
-    registry.register(createAcpProvider(ctx))
-    registry.register(createStandardProvider(ctx))
-    registry.register(createOpencodeProvider(ctx))
-    if (process.env.CRADLE_MOCK_LLM_URL) {
-      registry.register(createMockClaudeAgentProvider(ctx))
-    }
-    else {
-      registry.register(createClaudeAgentProvider(ctx))
-    }
-    registry.register(createCodexProvider(ctx, {
-      readCodexPreferences: () => Preferences.getCodexPreferencesSync(),
-      readCodexCliCompatibleIdentity: () => Preferences.isAppFeatureFlagEnabled('codexCliCompatibleIdentity'),
-      readChatPreferences: () => Preferences.getChatPreferencesSync(),
-      reconcileUsage: async (input) => {
-        await reconcileCodexSessionUsage(input)
-      },
-      resolveProviderTargetProfile: (providerTargetId) => {
-        const target = resolveProviderTargetForRuntime(providerTargetId, 'codex')
-        if (!target.enabled) {
-          return null
-        }
-        const config = JSON.parse(target.configJson) as Record<string, unknown>
-        return {
-          id: target.id,
-          name: target.label,
-          providerKind: target.providerKind,
-          enabled: target.enabled,
-          configJson: JSON.stringify({
-            ...config,
-            modelRegistryMappings: ModelRegistry.listMappingEntries(),
-          }),
-          credentialRef: target.credentialRef,
-          customModels: target.customModelsJson,
-          iconSlug: target.iconSlug,
-          providerTargetKind: target.kind,
-          providerTargetId: target.id,
-        }
-      },
-    }))
-    registry.register(createKimiProvider(ctx))
-    registry.register(createSystemAgentProvider(ctx))
+    // Builtin runtimes register metadata eagerly and implementation lazily.
+    // The static catalog (models, provider kinds, capabilities) must not pay
+    // the implementation module cost — it is the dominant share of server
+    // boot memory. Metadata constants live in provider-owned `metadata.ts`
+    // modules that stay free of implementation imports.
+    registry.registerLazy(ACP_RUNTIME_KIND, ACP_RUNTIME_METADATA, () => loadAcpProvider(ctx))
+    registry.registerLazy(STANDARD_RUNTIME_KIND, STANDARD_RUNTIME_METADATA, () => loadStandardProvider(ctx))
+    registry.registerLazy(OPENCODE_RUNTIME_KIND, OPENCODE_RUNTIME_METADATA, () => loadOpencodeProvider(ctx))
+    registry.registerLazy(CLAUDE_AGENT_RUNTIME_KIND, CLAUDE_AGENT_RUNTIME_METADATA, () => loadClaudeAgentProvider(ctx))
+    registry.registerLazy(CODEX_RUNTIME_KIND, CODEX_RUNTIME_METADATA, () => loadCodexProvider(ctx))
+    registry.registerLazy(KIMI_RUNTIME_KIND, KIMI_RUNTIME_METADATA, () => loadKimiProvider(ctx))
+    registry.registerLazy(SYSTEM_AGENT_RUNTIME_KIND, SYSTEM_AGENT_RUNTIME_METADATA, () => loadSystemAgentProvider(ctx))
   }
   return registry
 }

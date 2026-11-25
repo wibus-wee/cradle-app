@@ -67,7 +67,7 @@ export async function streamSideConversationResponse(
       },
     })
   }
-  const runtime = getRuntimeRegistry().get(record.runtimeKind)
+  const runtime = await getRuntimeRegistry().require(record.runtimeKind)
   if (!runtime) {
     throw new AppError({
       code: 'chat_runtime_not_available',

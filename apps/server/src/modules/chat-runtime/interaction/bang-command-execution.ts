@@ -70,7 +70,7 @@ export async function executeBangCommand(
   const command = normalizeBangCommandOrThrow(input.command)
   const session = assertStoredSession(input.sessionId)
   const runtimeKind = session.runtimeKind ?? 'standard'
-  const runtime = getRuntimeRegistry().get(runtimeKind)
+  const runtime = await getRuntimeRegistry().require(runtimeKind)
 
   if (!runtime?.capabilities.supportsShellExecution || !runtime.executeShellCommand) {
     return await executeLocalBangCommand({ ...input, command })

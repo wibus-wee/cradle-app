@@ -12,14 +12,8 @@ import {
   updateServerProcessMetrics,
 } from '../../telemetry/metrics'
 import * as ChatRuntime from '../chat-runtime/runtime'
-import {
-  getCodexAppServerNativeDiagnostics,
-  getCodexAppServerResources,
-} from '../chat-runtime-providers/codex/app-server/resources'
 import type { KimiServerResources } from '../chat-runtime-providers/kimi/resources'
-import { getKimiServerResources } from '../chat-runtime-providers/kimi/resources'
 import type { OpencodeServerResources } from '../chat-runtime-providers/opencode/runtime-context'
-import { getOpencodeServerResources } from '../chat-runtime-providers/opencode/runtime-context'
 import { getDaemonResources } from '../chronicle/daemon-manager'
 import * as Health from '../health/service'
 import { providerRuntimeHostManager } from '../provider-runtime/host-manager'
@@ -369,15 +363,18 @@ export async function getRuntimeSnapshot() {
     .map(run => ChatRuntime.getActiveRunStreamPublicationSummary(run.runId))
     .filter(item => item !== null)
   const providerHosts = providerRuntimeHostManager.listHosts()
-  const [pty, codexNativeDiagnostics] = await Promise.all([
+  const [pty, codexResourcesModule, opencodeResourcesModule, kimiResourcesModule] = await Promise.all([
     Pty.listResources(),
-    getCodexAppServerNativeDiagnostics(),
+    import('../chat-runtime-providers/codex/app-server/resources'),
+    import('../chat-runtime-providers/opencode/runtime-context'),
+    import('../chat-runtime-providers/kimi/resources'),
   ])
+  const codexNativeDiagnostics = await codexResourcesModule.getCodexAppServerNativeDiagnostics()
   const chronicle = getDaemonResources()
-  const opencodeServer = summarizeOpencodeServerResources(getOpencodeServerResources())
-  const kimiServer = summarizeKimiServerResources(getKimiServerResources())
+  const opencodeServer = summarizeOpencodeServerResources(opencodeResourcesModule.getOpencodeServerResources())
+  const kimiServer = summarizeKimiServerResources(kimiResourcesModule.getKimiServerResources())
   const codexAppServer = {
-    ...summarizeRuntimeProcessResources(getCodexAppServerResources()),
+    ...summarizeRuntimeProcessResources(codexResourcesModule.getCodexAppServerResources()),
     nativeDiagnostics: codexNativeDiagnostics,
   }
   const observability = getQueueHealth()

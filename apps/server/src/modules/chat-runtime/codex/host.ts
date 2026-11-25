@@ -230,7 +230,7 @@ async function resolveCodexAppServerContext(input: {
     assertRuntimeCompatibleTarget(context, input.providerTargetId),
   )
 
-  const runtime = getRuntimeRegistry().get('codex')
+  const runtime = await getRuntimeRegistry().require('codex')
   if (!isCodexAppServerRuntime(runtime)) {
     throw new AppError({
       code: 'chat_runtime_not_available',

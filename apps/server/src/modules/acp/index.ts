@@ -2,7 +2,7 @@ import { Elysia, t } from 'elysia'
 
 import { AppError } from '../../errors/app-error'
 import { getRuntimeRegistry } from '../chat-runtime/chat-runtime-provider-registry'
-import { AcpChatProvider } from '../chat-runtime-providers/acp/provider'
+import type { AcpChatProvider } from '../chat-runtime-providers/acp/provider'
 import * as Secrets from '../secrets/service'
 import * as Workspace from '../workspace/service'
 import { AcpModel } from './model'
@@ -21,8 +21,11 @@ function requireNonBlankString(value: string | undefined, field: string): string
   return trimmed
 }
 
-function requireAcpRuntime(): AcpChatProvider {
-  const runtime = getRuntimeRegistry().get('acp-chat')
+async function requireAcpRuntime(): Promise<AcpChatProvider> {
+  const [{ runtime }, { AcpChatProvider }] = await Promise.all([
+    getRuntimeRegistry().require('acp-chat').then(runtime => ({ runtime })),
+    import('../chat-runtime-providers/acp/provider'),
+  ])
   if (!(runtime instanceof AcpChatProvider)) {
     throw new AppError({ code: 'acp_runtime_not_available', status: 501, message: 'ACP Chat runtime is not available' })
   }
@@ -123,7 +126,7 @@ export function createAcpModule(downloadCenter: AcpDownloadCenter) {
   .get('/agents/:agentId/auth-methods', async ({ params }) => {
     const agentId = requireNonBlankString(params.agentId, 'agentId')
     const selection = Acp.readAgentAuthConfig(agentId)
-    const methods = await requireAcpRuntime().listAgentAuthMethods(agentId)
+    const methods = await (await requireAcpRuntime()).listAgentAuthMethods(agentId)
     return { methods, selectedMethodId: selection.methodId }
   }, {
     detail: {
@@ -137,7 +140,7 @@ export function createAcpModule(downloadCenter: AcpDownloadCenter) {
   })
   .put('/agents/:agentId/auth', async ({ params, body }) => {
     const agentId = requireNonBlankString(params.agentId, 'agentId')
-    const runtime = requireAcpRuntime()
+    const runtime = await requireAcpRuntime()
     Acp.readAgentAuthConfig(agentId)
     const methods = await runtime.listAgentAuthMethods(agentId)
     const selection = Acp.setAgentAuthSelection(agentId, {
@@ -158,7 +161,7 @@ export function createAcpModule(downloadCenter: AcpDownloadCenter) {
   })
   .delete('/agents/:agentId/auth', async ({ params }) => {
     const agentId = requireNonBlankString(params.agentId, 'agentId')
-    const runtime = requireAcpRuntime()
+    const runtime = await requireAcpRuntime()
     Acp.clearAgentAuthSelection(agentId)
     await runtime.disconnectAgent(agentId)
     return { selectedMethodId: null }
@@ -185,7 +188,7 @@ export function createAcpModule(downloadCenter: AcpDownloadCenter) {
       distributionType: body.distributionType,
       version: body.version,
     })
-    await requireAcpRuntime().disconnectAgent(agentId)
+    await (await requireAcpRuntime()).disconnectAgent(agentId)
     return agent
   }, {
     detail: {
@@ -208,7 +211,7 @@ export function createAcpModule(downloadCenter: AcpDownloadCenter) {
       headerSecretRefs: body.headerSecretRefs,
       version: body.version,
     }, availableSecretIds)
-    await requireAcpRuntime().disconnectAgent(agentId)
+    await (await requireAcpRuntime()).disconnectAgent(agentId)
     return agent
   }, {
     detail: {
@@ -221,7 +224,7 @@ export function createAcpModule(downloadCenter: AcpDownloadCenter) {
     body: AcpModel.remoteConfigBody,
     response: { 200: AcpModel.acpAgent },
   })
-  .post('/agents/:agentId/draft-session', ({ params, body }) => {
+  .post('/agents/:agentId/draft-session', async ({ params, body }) => {
     const agentId = requireNonBlankString(params.agentId, 'agentId')
     const agent = Acp.getInstalled(agentId)
     if (!agent || agent.status !== 'installed') {
@@ -236,7 +239,7 @@ export function createAcpModule(downloadCenter: AcpDownloadCenter) {
         details: { workspaceId: body.workspaceId },
       })
     }
-    const runtime = requireAcpRuntime()
+    const runtime = await requireAcpRuntime()
     return runtime.openDraftSession({ agentId, workspacePath: workspacePath ?? '' })
   }, {
     detail: { summary: 'Open an ACP draft session and read its native model choices' },
@@ -245,7 +248,7 @@ export function createAcpModule(downloadCenter: AcpDownloadCenter) {
     response: { 200: AcpModel.draftSessionResult },
   })
   .delete('/agents/:agentId/draft-session/:sessionId', async ({ params }) => {
-    await requireAcpRuntime().closeDraftSession({
+    await (await requireAcpRuntime()).closeDraftSession({
       agentId: requireNonBlankString(params.agentId, 'agentId'),
       sessionId: requireNonBlankString(params.sessionId, 'sessionId'),
     })
@@ -287,7 +290,7 @@ export function createAcpModule(downloadCenter: AcpDownloadCenter) {
   })
   .delete('/agents/:agentId', async ({ params }) => {
     const agentId = requireNonBlankString(params.agentId, 'agentId')
-    await requireAcpRuntime().disconnectAgent(agentId)
+    await (await requireAcpRuntime()).disconnectAgent(agentId)
     await Acp.uninstall(agentId)
     return { ok: true as const }
   }, {

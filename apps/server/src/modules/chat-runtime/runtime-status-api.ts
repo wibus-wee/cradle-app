@@ -207,7 +207,7 @@ export async function getRuntimeSessionStatus(
     : false
   const providerTargetAvailable = activeRun ? true : isProviderTargetAvailable(providerTargetId)
   const goalContinuationOptions = deps.readRuntimeGoalContinuationOptions()
-  const runtime = binding ? getRuntimeRegistry().get(binding.runtimeKind) : undefined
+  const runtime = binding ? await getRuntimeRegistry().require(binding.runtimeKind) : undefined
   const hasActiveGoal
     = hasContinuableRuntimeGoal({
       runtime,
@@ -245,7 +245,7 @@ export async function getRuntimeSessionStatus(
     pendingQueueItemId: pendingState?.queueItemId ?? null,
     hasActiveGoal,
     supportsLastTurnRollback:
-      getRuntimeRegistry().get(runtimeKind)?.capabilities.supportsLastTurnRollback ?? false,
+      (await getRuntimeRegistry().require(runtimeKind))?.capabilities.supportsLastTurnRollback ?? false,
     activeRun: activeRun
       ? toRuntimeSessionRunDto(activeRun, getRun(activeRun.runId), { runtimeSettings })
       : null,

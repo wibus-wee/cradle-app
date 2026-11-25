@@ -7,7 +7,19 @@ import type { RuntimeKind } from '../../provider-contracts/types'
 
 export const OPENCODE_RUNTIME_KIND: RuntimeKind = 'opencode'
 
+export const OPENCODE_RUNTIME_CAPABILITIES = {
+  steer: 'queue-fallback',
+  supportsShellExecution: true,
+  supportsLastTurnRollback: true,
+  supportsRuntimeSettings: true,
+  supportsUiSlotStates: true,
+  supportsDynamicCapabilities: false,
+  supportsTitleGeneration: true,
+  sessionModelSwitch: 'in-session',
+} satisfies ChatRuntimeCapabilities
+
 export const OPENCODE_RUNTIME_METADATA = {
+  capabilities: OPENCODE_RUNTIME_CAPABILITIES,
   label: 'Opencode',
   description: 'Opencode server runtime',
   providerKinds: ['openai-compatible', 'anthropic', 'universal'],
@@ -19,14 +31,3 @@ export const OPENCODE_RUNTIME_METADATA = {
   sortOrder: 25,
   settingsSchema: readRuntimeSettingsSchema('opencode') ?? undefined,
 } satisfies ChatRuntimeMetadata
-
-export const OPENCODE_RUNTIME_CAPABILITIES = {
-  steer: 'queue-fallback',
-  supportsShellExecution: true,
-  supportsLastTurnRollback: true,
-  supportsRuntimeSettings: true,
-  supportsUiSlotStates: true,
-  supportsDynamicCapabilities: false,
-  supportsTitleGeneration: true,
-  sessionModelSwitch: 'in-session',
-} satisfies ChatRuntimeCapabilities

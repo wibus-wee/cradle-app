@@ -351,7 +351,7 @@ export const chatRuntimeIntrospectionRoutes = new Elysia({
     '/sessions/:sessionId/codex/app-server/capabilities',
     async ({ params }) => {
       await (await loadChatRuntime()).getRuntimeSessionStatus(params.sessionId)
-      if (!getRuntimeRegistry().get('codex')) {
+      if (!(await getRuntimeRegistry().require('codex'))) {
         throw new AppError({
           code: 'chat_runtime_not_available',
           status: 501,

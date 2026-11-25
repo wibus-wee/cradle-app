@@ -111,8 +111,8 @@ export function getSessionRunContext(
     if (runtimeOwnedProviderTargetOwner !== runtimeKind) {
       return null
     }
-    const runtime = getRuntimeRegistry().get(runtimeKind)
-    if (runtime?.metadata.providerBinding !== 'runtime-owned') {
+    const metadata = getRuntimeRegistry().metadata(runtimeKind)
+    if (metadata?.providerBinding !== 'runtime-owned') {
       return null
     }
     return {
@@ -123,8 +123,8 @@ export function getSessionRunContext(
       effectiveModelId: null,
     }
   }
-  const runtime = getRuntimeRegistry().get(runtimeKind)
-  if (providerTarget && runtime?.metadata.providerBinding === 'runtime-owned') {
+  const metadata = getRuntimeRegistry().metadata(runtimeKind)
+  if (providerTarget && metadata?.providerBinding === 'runtime-owned') {
     throw new AppError({
       code: 'invalid_provider_target',
       status: 400,
@@ -143,7 +143,7 @@ export function getSessionRunContext(
   const sessionConfig = parseJsonObject(session.configJson)
 
   if (!providerTarget) {
-    if (runtime?.metadata.providerBinding === 'runtime-owned') {
+    if (metadata?.providerBinding === 'runtime-owned') {
       return {
         session,
         workspacePath: workspacePath ?? '',
@@ -152,7 +152,7 @@ export function getSessionRunContext(
         effectiveModelId: null,
       }
     }
-    if (runtime?.metadata.providerBinding === 'none') {
+    if (metadata?.providerBinding === 'none') {
       const profile = buildRuntimeConfigOnlyProfile({ agentConfig, sessionConfig })
       if (!profile) {
         return null
@@ -572,7 +572,7 @@ export async function resolveRuntimeSessionContext(
 
   const registry = getRuntimeRegistry()
   const runtimeKind = context.session.runtimeKind ?? 'standard'
-  const runtime = registry.get(runtimeKind)
+  const runtime = await registry.require(runtimeKind)
   if (!runtime) {
     throw new AppError({
       code: 'chat_runtime_not_available',
