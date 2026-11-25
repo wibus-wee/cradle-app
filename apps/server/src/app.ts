@@ -398,8 +398,6 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
       { activateServerPlugins, deactivateAllPlugins, mountPluginRoutes },
       conversationBridgeSupervisor,
       { destroyWorkspaceFileIndexes },
-      { prepareOpencodeManagedPathForRemoval, stopOpencodeServer },
-      { prepareCodexManagedPathForRemoval },
       { shutdownImageOcr },
       { CodexUsageReconciliationScheduler },
       { registerRunSnapshotMaintenance },
@@ -416,20 +414,28 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
       import('./plugins/loader'),
       import('./modules/conversation-bridge/runtime-supervisor'),
       import('./modules/workspace/files'),
-      import('./modules/chat-runtime-providers/opencode/runtime-context'),
-      import('./modules/chat-runtime-providers/codex/app-server/host-lease'),
       import('./modules/image-ocr/service'),
       import('./modules/chat-runtime-providers/codex/usage-reconciliation-scheduler'),
       import('./modules/chat-runtime/run-snapshot-maintenance'),
       import('./modules/mcp-servers/service'),
     ])
+    // Lazy provider-managed-path hooks: the runtime-context modules pull the
+    // full provider SDK surface (@opencode-ai/sdk, codex host-lease machinery),
+    // which V8 must compile even though these callbacks fire only when an old
+    // runtime version is being replaced — or never during a typical session.
     const opencodeRuntimeInstallationService = new OpencodeRuntimeInstallationService({
       downloadCenter: downloadCenterService,
-      prepareManagedPathForRemoval: prepareOpencodeManagedPathForRemoval,
+      prepareManagedPathForRemoval: async (binaryPath) => {
+        const { prepareOpencodeManagedPathForRemoval } = await import('./modules/chat-runtime-providers/opencode/runtime-context')
+        return prepareOpencodeManagedPathForRemoval(binaryPath)
+      },
     })
     const codexRuntimeInstallationService = new CodexRuntimeInstallationService({
       downloadCenter: downloadCenterService,
-      prepareManagedPathForRemoval: prepareCodexManagedPathForRemoval,
+      prepareManagedPathForRemoval: async (binaryPath) => {
+        const { prepareCodexManagedPathForRemoval } = await import('./modules/chat-runtime-providers/codex/app-server/host-lease')
+        return prepareCodexManagedPathForRemoval(binaryPath)
+      },
     })
     const claudeCodeRuntimeInstallationService = new ClaudeCodeRuntimeInstallationService({
       downloadCenter: downloadCenterService,
@@ -535,7 +541,6 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
         mountPluginRoutes,
         conversationBridgeSupervisor,
         destroyWorkspaceFileIndexes,
-        stopOpencodeServer,
         shutdownImageOcr,
         CodexUsageReconciliationScheduler,
         hydrateCustomMcpServers,
@@ -558,7 +563,6 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
     mountPluginRoutes,
     conversationBridgeSupervisor,
     destroyWorkspaceFileIndexes,
-    stopOpencodeServer,
     shutdownImageOcr,
     CodexUsageReconciliationScheduler,
     hydrateCustomMcpServers,
@@ -690,7 +694,14 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
     phase: 'stop',
     stop: () => providerRuntimeHostManager.shutdown(),
   })
-  runtimeResources.register({ name: 'opencode-server', phase: 'stop', stop: stopOpencodeServer })
+  runtimeResources.register({
+    name: 'opencode-server',
+    phase: 'stop',
+    stop: async () => {
+      const { stopOpencodeServer } = await import('./modules/chat-runtime-providers/opencode/runtime-context')
+      await stopOpencodeServer()
+    },
+  })
   runtimeResources.register({
     name: 'background-job-poller',
     phase: 'cancel',
