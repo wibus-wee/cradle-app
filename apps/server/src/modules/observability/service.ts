@@ -1,9 +1,10 @@
 import type { BackendRunSnapshot, BackendRunSnapshotEvent, NewObservabilityEventRow, ObservabilityEventRow, ObservabilityIncidentRow } from '@cradle/db'
 import { backendRunSnapshotEvents, backendRunSnapshots, observabilityEvents, observabilityIncidents } from '@cradle/db'
 import type { SQL } from 'drizzle-orm'
-import { and, desc, eq, gte, lte } from 'drizzle-orm'
+import { and, desc, eq, gte, inArray, lt, lte } from 'drizzle-orm'
 import { z } from 'zod'
 
+import { readNonNegativeIntegerEnv } from '../../helpers/env'
 import { db } from '../../infra'
 import { createChildLogger } from '../../logging/logger'
 import { recordObservabilityDroppedEvents } from '../../telemetry/metrics'
@@ -346,6 +347,61 @@ export function recordDesktopRuntimeSample(sample: DesktopRuntimeSample): { ok: 
 
 export function getDesktopRuntimeSamples(): DesktopRuntimeSample[] {
   return [...desktopRuntimeSamples]
+}
+
+const RETENTION_BATCH_SIZE = 500
+const DEFAULT_EVENT_RETENTION_DAYS = 14
+
+export interface ObservabilityEventRetentionResult {
+  retentionDays: number
+  prunedEvents: number
+}
+
+/**
+ * Delete observability_events rows recorded before the retention window. These
+ * rows are pure telemetry — incident aggregates survive in
+ * observability_incidents with their own count/message/attrs, and every FK
+ * pointing at events is `onDelete: 'set null'`, so pruning cannot violate
+ * referential integrity.
+ *
+ * `CRADLE_OBSERVABILITY_EVENT_RETENTION_DAYS=0` disables pruning entirely.
+ */
+export function pruneObservabilityEvents(
+  now = Date.now(),
+  deadline = Number.POSITIVE_INFINITY,
+): ObservabilityEventRetentionResult {
+  const retentionDays = readNonNegativeIntegerEnv(
+    'CRADLE_OBSERVABILITY_EVENT_RETENTION_DAYS',
+    DEFAULT_EVENT_RETENTION_DAYS,
+  )
+  if (retentionDays === 0) {
+    return { retentionDays, prunedEvents: 0 }
+  }
+  const cutoff = now - retentionDays * 24 * 60 * 60 * 1000
+  let prunedEvents = 0
+  // Bound each transaction so the maintenance pass stays interruptible; the
+  // deadline keeps the first large backlog pass inside the activity budget and
+  // lets the next hourly run continue the sweep.
+  while (Date.now() < deadline) {
+    const pruned = db().transaction((tx) => {
+      const ids = tx
+        .select({ id: observabilityEvents.id })
+        .from(observabilityEvents)
+        .where(lt(observabilityEvents.recordedAt, cutoff))
+        .limit(RETENTION_BATCH_SIZE)
+        .all()
+        .map(row => row.id)
+      if (ids.length > 0) {
+        tx.delete(observabilityEvents).where(inArray(observabilityEvents.id, ids)).run()
+      }
+      return ids.length
+    })
+    prunedEvents += pruned
+    if (pruned < RETENTION_BATCH_SIZE) {
+      break
+    }
+  }
+  return { retentionDays, prunedEvents }
 }
 
 export async function shutdown(): Promise<void> {

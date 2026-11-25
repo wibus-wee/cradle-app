@@ -1,6 +1,7 @@
 # Observability Module
 
 Provides canonical observability event capture, incident projection, queue-backed persistence, error-pattern inspection, runtime snapshot inspection, and HTTP query/export surfaces.
+Event rows are pure telemetry with retention: the `prune-events` Maintenance activity deletes `observability_events` recorded before `CRADLE_OBSERVABILITY_EVENT_RETENTION_DAYS` (default 14, 0 disables) in 500-row transactions bounded by the activity deadline. Incident aggregates in `observability_incidents` are the durable signal and are never pruned by retention; their `last_event_id` reference is `onDelete: 'set null'`, so pruning cannot violate referential integrity.
 Event and incident list filters, newest-first ordering, and limits are applied by SQLite through Drizzle so diagnostic reads do not materialize the full retained history in server memory.
 Observability reads Chat Runtime-owned run snapshots to build diagnostics timelines and error pattern buckets, but it does not own provider runtime semantics or write provider namespaces.
 Incident dedupe is intentionally signal-oriented rather than always run-scoped: chat stream failures aggregate by code so development-time interrupted runs do not create one incident per run, while producers may still pass an explicit dedupe key for cases that need narrower ownership.

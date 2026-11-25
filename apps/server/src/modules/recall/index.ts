@@ -14,6 +14,7 @@ import {
   projectRecallMessage,
   projectRecallRun,
   projectRecallToolEventRecord,
+  pruneRecallToolEvents,
   rebuildRecallProjection,
   reconcileRecallProjection,
 } from './service'
@@ -96,6 +97,15 @@ export function initializeRecallProjection(): void {
     runOnStart: false,
     manuallyRunnable: true,
     run: () => ({ ...reconcileRecallProjection() }),
+  })
+  Maintenance.registerTask({
+    ownerNamespace: 'recall',
+    key: 'prune-tool-events',
+    title: 'Prune expired Recall tool events',
+    intervalMs: 60 * 60 * 1000,
+    runOnStart: true,
+    manuallyRunnable: true,
+    run: context => ({ ...pruneRecallToolEvents(context.now, context.deadline) }),
   })
 }
 

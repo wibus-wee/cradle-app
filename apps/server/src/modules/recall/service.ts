@@ -9,8 +9,9 @@ import {
   recallToolEvents,
   sessions,
 } from '@cradle/db'
-import { and, eq, inArray, isNotNull, isNull } from 'drizzle-orm'
+import { and, eq, inArray, isNotNull, isNull, lt } from 'drizzle-orm'
 
+import { readNonNegativeIntegerEnv } from '../../helpers/env'
 import { db } from '../../infra'
 import type { ChatRuntimeTx, ChatRuntimeWriteDb } from '../chat-runtime/es/event-store'
 import { messagePayloadJoinCondition } from '../chat-runtime/message-payload-store'
@@ -18,6 +19,60 @@ import { extractRecallFileTouchPaths } from './file-touch-extractor'
 
 const MAX_EXCERPT_LENGTH = 8_000
 const RECONCILIATION_BATCH_SIZE = 500
+const RETENTION_BATCH_SIZE = 500
+const DEFAULT_TOOL_EVENT_RETENTION_DAYS = 30
+
+export interface RecallToolEventRetentionResult {
+  retentionDays: number
+  prunedToolEvents: number
+}
+
+/**
+ * Delete recall_tool_events rows older than the retention window. Recall rows
+ * are a rebuildable evidence projection — no user-facing surface depends on
+ * keeping them forever, and `recall_file_touches` rows cascade away with their
+ * parent events. Source rows in backend_run_snapshot_events have their own
+ * retention in chat-runtime and are unaffected here.
+ *
+ * `CRADLE_RECALL_TOOL_EVENT_RETENTION_DAYS=0` disables pruning entirely.
+ */
+export function pruneRecallToolEvents(
+  now = Date.now(),
+  deadline = Number.POSITIVE_INFINITY,
+): RecallToolEventRetentionResult {
+  const retentionDays = readNonNegativeIntegerEnv(
+    'CRADLE_RECALL_TOOL_EVENT_RETENTION_DAYS',
+    DEFAULT_TOOL_EVENT_RETENTION_DAYS,
+  )
+  if (retentionDays === 0) {
+    return { retentionDays, prunedToolEvents: 0 }
+  }
+  const cutoff = now - retentionDays * 24 * 60 * 60 * 1000
+  let prunedToolEvents = 0
+  // Bound each transaction so the maintenance pass stays interruptible; the
+  // deadline keeps the first large backlog pass inside the activity budget and
+  // lets the next hourly run continue the sweep.
+  while (Date.now() < deadline) {
+    const pruned = db().transaction((tx) => {
+      const ids = tx
+        .select({ id: recallToolEvents.id })
+        .from(recallToolEvents)
+        .where(lt(recallToolEvents.occurredAt, cutoff))
+        .limit(RETENTION_BATCH_SIZE)
+        .all()
+        .map(row => row.id)
+      if (ids.length > 0) {
+        tx.delete(recallToolEvents).where(inArray(recallToolEvents.id, ids)).run()
+      }
+      return ids.length
+    })
+    prunedToolEvents += pruned
+    if (pruned < RETENTION_BATCH_SIZE) {
+      break
+    }
+  }
+  return { retentionDays, prunedToolEvents }
+}
 
 type RecallProjectionDb = Pick<ChatRuntimeWriteDb, 'delete' | 'insert' | 'select'>
 
