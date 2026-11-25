@@ -1,9 +1,10 @@
 import { Elysia, t } from 'elysia'
 
-import { getOpencodeServerResources } from '../chat-runtime-providers/opencode/runtime-context'
-
 export const opencodeServer = new Elysia({ prefix: '/opencode' })
-  .get('/server/resources', () => getOpencodeServerResources(), {
+  .get('/server/resources', async () => {
+    const { getOpencodeServerResources } = await import('../chat-runtime-providers/opencode/runtime-context')
+    return getOpencodeServerResources()
+  }, {
     detail: {
       'summary': 'Get active pooled opencode host process resource samples',
       'tags': ['opencode'],

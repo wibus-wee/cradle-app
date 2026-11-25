@@ -1,9 +1,10 @@
 import { Elysia, t } from 'elysia'
 
-import { getCodexAppServerResources } from '../chat-runtime-providers/codex/app-server/resources'
-
 export const codexAppServer = new Elysia({ prefix: '/codex' })
-  .get('/app-server/resources', () => getCodexAppServerResources(), {
+  .get('/app-server/resources', async () => {
+    const { getCodexAppServerResources } = await import('../chat-runtime-providers/codex/app-server/resources')
+    return getCodexAppServerResources()
+  }, {
     detail: {
       'summary': 'Get active codex app-server process resource samples',
       'tags': ['codex'],

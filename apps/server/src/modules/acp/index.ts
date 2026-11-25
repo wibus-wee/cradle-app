@@ -2,7 +2,7 @@ import { Elysia, t } from 'elysia'
 
 import { AppError } from '../../errors/app-error'
 import { getRuntimeRegistry } from '../chat-runtime/chat-runtime-provider-registry'
-import { AcpChatProvider } from '../chat-runtime-providers/acp/provider'
+import type { AcpChatProvider } from '../chat-runtime-providers/acp/provider'
 import * as Secrets from '../secrets/service'
 import * as Workspace from '../workspace/service'
 import { AcpModel } from './model'
@@ -22,7 +22,10 @@ function requireNonBlankString(value: string | undefined, field: string): string
 }
 
 async function requireAcpRuntime(): Promise<AcpChatProvider> {
-  const runtime = await getRuntimeRegistry().require('acp-chat')
+  const [{ runtime }, { AcpChatProvider }] = await Promise.all([
+    getRuntimeRegistry().require('acp-chat').then(runtime => ({ runtime })),
+    import('../chat-runtime-providers/acp/provider'),
+  ])
   if (!(runtime instanceof AcpChatProvider)) {
     throw new AppError({ code: 'acp_runtime_not_available', status: 501, message: 'ACP Chat runtime is not available' })
   }
