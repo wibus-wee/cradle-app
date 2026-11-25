@@ -35,14 +35,11 @@ jobs:
           base: ${{ github.event.before }}
           filters: .github/ci-paths.yml
 
-  deploy-web:
-    name: Deploy Web
+  build-web:
+    name: Build Web
     needs: changes
     if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.deploy == 'true'
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: https://app.cradle.wibus.ren
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -68,11 +65,26 @@ jobs:
           echo "app.cradle.wibus.ren" > apps/web/dist/CNAME
           cp apps/web/dist/index.html apps/web/dist/404.html
 
+      # upload-pages-artifact@v3 + deploy-pages@v4 pin mismatched
+      # @actions/artifact versions; since GitHub's artifact blob-storage
+      # backend rollout the pair intermittently becomes invisible to
+      # deploy-pages' twirp listArtifacts ("Found 0 artifacts" right after a
+      # successful upload — actions/deploy-pages#305). v4/v5 align both sides
+      # on the current artifact SDK. Deploy stays in a separate job, the
+      # officially recommended structure for Pages deployments.
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v4
         with:
           path: apps/web/dist
 
+  deploy-web:
+    name: Deploy Web
+    needs: build-web
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: https://app.cradle.wibus.ren
+    steps:
       - name: Deploy Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
