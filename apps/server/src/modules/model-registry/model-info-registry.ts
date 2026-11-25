@@ -128,6 +128,13 @@ let refreshInFlight: Promise<ModelsDevData | null> | null = null
 let refreshRetryTimer: ReturnType<typeof setTimeout> | null = null
 let refreshRetryAttempt = 0
 let cacheGeneration = 0
+/**
+ * Count of consumers that actually read models.dev data. A background
+ * refresh triggered before the lazy warmup fires applies only when someone
+ * is interested — otherwise applying it would parse + retain the snapshot
+ * for nothing.
+ */
+let interestedConsumers = 0
 let dbCacheLoaded = false
 let mappingCacheLoaded = false
 const mappingCache = new Map<string, ModelRegistryMappingEntry>()
@@ -315,9 +322,17 @@ async function refreshFromNetwork(): Promise<ModelsDevData | null> {
   const generation = cacheGeneration
   try {
     const fresh = await fetchFromNetwork()
-    if (fresh && generation === cacheGeneration) {
-      return applyFresh(fresh)
+    if (!fresh) {
+      return null
     }
+    // Retain the snapshot only when someone reads models.dev data. Before the
+    // delayed warmup fires and without any consumer, applying it would parse
+    // and hold ~8MB for nothing — the refresh itself stays a cheap probe.
+    // The awaiter still receives fresh data either way.
+    if (generation === cacheGeneration && interestedConsumers > 0) {
+      applyFresh(fresh)
+    }
+    return generation === cacheGeneration ? fresh : null
   }
   catch {
     // non-critical — caller falls back to stale
@@ -332,10 +347,13 @@ function scheduleRefreshRetry(): void {
 
   const delay = REFRESH_RETRY_DELAYS_MS[Math.min(refreshRetryAttempt, REFRESH_RETRY_DELAYS_MS.length - 1)]
   refreshRetryAttempt += 1
+  // Unref: a retry of an optional background refresh must not hold the
+  // process (or keep the event loop busy) on its own.
   refreshRetryTimer = setTimeout(() => {
     refreshRetryTimer = null
     void refreshModelsDevData()
   }, delay)
+  refreshRetryTimer.unref()
 }
 
 function refreshModelsDevData(): Promise<ModelsDevData | null> {
@@ -374,6 +392,9 @@ function scheduleBackgroundRefresh(): void {
  * - age ≥ hard (or miss) → await network; fall back to stale on failure
  */
 export async function fetchModelsDevData(options?: { forceRefresh?: boolean }): Promise<ModelsDevData | null> {
+  // A real consumer: its refresh results must be applied even when the
+  // warmup timer has not fired yet.
+  interestedConsumers += 1
   const cached = loadDbCacheIntoMemory()
   if (options?.forceRefresh) {
     return (await refreshModelsDevData()) ?? cached?.data ?? getInMemoryCache()?.data ?? null
@@ -394,8 +415,23 @@ export async function fetchModelsDevData(options?: { forceRefresh?: boolean }): 
   return refreshModelsDevData()
 }
 
-/** Load the durable snapshot once, then refresh models.dev without blocking requests. */
+/**
+ * Schedule the models.dev warmup off the boot critical path. Parsing the
+ * durable snapshot costs ~40ms CPU and ~8MB heap; most sessions never open
+ * model settings or start a chat, so both the parse and the refresh retry
+ * timers stay dormant until something actually reads the registry.
+ */
 export function warmupModelsDevCache(): void {
+  setTimeout(() => {
+    loadDbCacheIntoMemory()
+    loadMappingCache()
+    scheduleBackgroundRefresh()
+  }, 10_000).unref()
+}
+
+/** Eager warmup for interactive entry points that expect the cache hot. */
+export function warmupModelsDevCacheNow(): void {
+  interestedConsumers += 1
   loadDbCacheIntoMemory()
   loadMappingCache()
   scheduleBackgroundRefresh()
