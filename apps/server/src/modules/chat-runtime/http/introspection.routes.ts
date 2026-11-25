@@ -111,7 +111,7 @@ export const chatRuntimeIntrospectionRoutes = new Elysia({
     async ({ query }) => {
       const runtime = query.runtimeKind === 'standard'
         ? undefined
-        : getRuntimeRegistry().get(query.runtimeKind)
+        : await getRuntimeRegistry().require(query.runtimeKind)
       if (!runtime) {
         throw new AppError({
           code: 'chat_runtime_not_available',
