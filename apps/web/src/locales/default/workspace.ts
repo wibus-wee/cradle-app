@@ -52,7 +52,7 @@ export default {
   'nav.pullRequests': 'Pull requests',
   'nav.disabled': 'Disabled',
   'githubRequired.eyebrow': 'GitHub required',
-  'githubRequired.connectHint': 'Connect your GitHub identity here. Cradle will unlock this feature as soon as authorization finishes.',
+  'githubRequired.connectHint': 'Connect your GitHub identity here, or sign in with the gh CLI in your terminal — Cradle detects either one automatically and unlocks this feature.',
   'githubRequired.pullRequests.title': 'Connect GitHub to use Pull Requests',
   'githubRequired.pullRequests.description': 'Pull Requests loads the PRs you author or review on GitHub. Authorize the Cradle GitHub App to continue.',
   'githubRequired.newWork.title': 'Connect GitHub to start Work',

@@ -16,7 +16,7 @@ export function GithubRequiredDialog() {
   const open = useGithubRequiredDialogStore(s => s.open)
   const feature = useGithubRequiredDialogStore(s => s.feature)
   const close = useGithubRequiredDialogStore(s => s.close)
-  const github = useGithubAppConnectionController()
+  const github = useGithubAppConnectionController({ pollWhileOpen: open })
 
   useEffect(() => {
     if (!open || !feature || !github.isConnected) {

@@ -38,6 +38,11 @@ export const GitHubAuthModel = {
     expiresAt: t.Union([t.Number(), t.Null()]),
     refreshTokenExpiresAt: t.Union([t.Number(), t.Null()]),
     error: t.Union([t.String(), t.Null()]),
+    localCredential: t.Object({
+      available: t.Boolean(),
+      login: t.Union([t.String(), t.Null()]),
+      source: t.Union([t.Literal('env'), t.Literal('gh-cli'), t.Null()]),
+    }),
   }),
   deviceLoginStart: t.Object({
     loginId: t.String(),

@@ -51,7 +51,7 @@
   "nav.pullRequests": "Pull requests",
   "nav.disabled": "已禁用",
   "githubRequired.eyebrow": "需要 GitHub",
-  "githubRequired.connectHint": "在这里连接你的 GitHub 身份。授权完成后，Cradle 会立刻解锁该功能。",
+  "githubRequired.connectHint": "在这里连接你的 GitHub 身份，或在终端里用 gh CLI 登录——Cradle 会自动识别任意一种，并立刻解锁该功能。",
   "githubRequired.pullRequests.title": "连接 GitHub 以使用 Pull Requests",
   "githubRequired.pullRequests.description": "Pull Requests 会加载你在 GitHub 上创建或审查的 PR。请授权 Cradle GitHub App 后继续。",
   "githubRequired.newWork.title": "连接 GitHub 以开始 Work",

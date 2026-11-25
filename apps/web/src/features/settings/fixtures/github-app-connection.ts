@@ -8,6 +8,12 @@ export const disconnectedGithubAppConnection: GithubAppConnection = {
   viewer: null,
   expiresAt: null,
   error: null,
+  localCredential: { available: false, login: null, source: null },
+}
+
+export const disconnectedWithLocalCredentialGithubAppConnection: GithubAppConnection = {
+  ...disconnectedGithubAppConnection,
+  localCredential: { available: true, login: 'octocat', source: 'gh-cli' },
 }
 
 export const pendingGithubAppLogin: GithubAppPendingLogin = {
@@ -25,6 +31,7 @@ export const connectedGithubAppConnection: GithubAppConnection = {
   viewer: { login: 'octocat', avatarUrl: null, profileUrl: 'https://github.com/octocat' },
   expiresAt: 1_785_000_000,
   error: null,
+  localCredential: { available: false, login: null, source: null },
 }
 
 export const expiredGithubAppConnection: GithubAppConnection = {
@@ -41,4 +48,5 @@ export const unconfiguredGithubAppConnection: GithubAppConnection = {
   viewer: null,
   expiresAt: null,
   error: 'GitHub App is not configured in this build.',
+  localCredential: { available: false, login: null, source: null },
 }

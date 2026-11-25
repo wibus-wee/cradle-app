@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { fn } from 'storybook/test'
 
-import { connectedGithubAppConnection, disconnectedGithubAppConnection, expiredGithubAppConnection, pendingGithubAppLogin, unconfiguredGithubAppConnection } from './fixtures/github-app-connection'
+import { connectedGithubAppConnection, disconnectedGithubAppConnection, disconnectedWithLocalCredentialGithubAppConnection, expiredGithubAppConnection, pendingGithubAppLogin, unconfiguredGithubAppConnection } from './fixtures/github-app-connection'
 import { GithubAppConnectionView } from './github-app-connection-view'
 
 const labels = {
@@ -26,6 +26,11 @@ const labels = {
   expired: 'Your GitHub connection has expired. Connect again to continue.',
   unavailable: 'GitHub App connection is unavailable in this build.',
   pendingCode: 'This code expires soon. Keep this window open while you finish in GitHub.',
+  localCredentialActive: 'Acting on GitHub as @{{login}} via local credentials',
+  localCredentialActiveAnonymous: 'Acting on GitHub via local credentials',
+  localCredentialActiveBadge: 'Active',
+  localCredentialUpgradeHint: 'Comments, reviews, and pull requests will appear on GitHub as plain actions from your account. Connect the Cradle App below to attribute them to Cradle instead.',
+  installDescriptionUpgrade: 'Optional: install the Cradle App into the repositories you use, then connect your GitHub identity for Cradle-attributed actions.',
 }
 
 const meta = {
@@ -48,6 +53,7 @@ export default meta
 type Story = StoryObj<typeof meta>
 
 export const Disconnected: Story = {}
+export const DisconnectedWithLocalCredential: Story = { args: { connection: disconnectedWithLocalCredentialGithubAppConnection } }
 export const Pending: Story = { args: { connection: { ...disconnectedGithubAppConnection, state: 'pending' }, pendingLogin: pendingGithubAppLogin } }
 export const Connected: Story = { args: { connection: connectedGithubAppConnection } }
 export const Expired: Story = { args: { connection: expiredGithubAppConnection } }

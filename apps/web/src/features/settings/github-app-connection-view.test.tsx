@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { connectedGithubAppConnection, disconnectedGithubAppConnection, pendingGithubAppLogin } from './fixtures/github-app-connection'
+import { connectedGithubAppConnection, disconnectedGithubAppConnection, disconnectedWithLocalCredentialGithubAppConnection, pendingGithubAppLogin } from './fixtures/github-app-connection'
 import { GithubAppConnectionView } from './github-app-connection-view'
 
 const labels = {
@@ -26,6 +26,11 @@ const labels = {
   expired: 'Your GitHub connection has expired. Connect again to continue.',
   unavailable: 'GitHub App connection is unavailable in this build.',
   pendingCode: 'This code expires soon. Keep this window open while you finish in GitHub.',
+  localCredentialActive: 'Acting on GitHub as @{{login}} via local credentials',
+  localCredentialActiveAnonymous: 'Acting on GitHub via local credentials',
+  localCredentialActiveBadge: 'Active',
+  localCredentialUpgradeHint: 'Comments, reviews, and pull requests will appear on GitHub as plain actions from your account. Connect the Cradle App below to attribute them to Cradle instead.',
+  installDescriptionUpgrade: 'Optional: install the Cradle App into the repositories you use, then connect your GitHub identity for Cradle-attributed actions.',
 }
 
 afterEach(cleanup)
@@ -54,6 +59,30 @@ describe('githubAppConnectionView', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(callbacks.onContinueInBrowser).toHaveBeenCalledOnce()
     expect(callbacks.onCancel).toHaveBeenCalledOnce()
+  })
+
+  it('shows the active local credential with an upgrade path when the App is not connected', () => {
+    renderView({ connection: disconnectedWithLocalCredentialGithubAppConnection })
+    expect(screen.getByText('Acting on GitHub as @octocat via local credentials')).toBeTruthy()
+    expect(screen.getByText(/plain actions from your account/)).toBeTruthy()
+    expect(screen.getByText(/Optional: install the Cradle App/)).toBeTruthy()
+  })
+
+  it('keeps the install copy mandatory when no local credential exists', () => {
+    renderView()
+    expect(screen.queryByText(/via local credentials/)).toBeNull()
+    expect(screen.getByText('First install the Cradle App into the organization and repositories where you want Cradle to act. Then connect your GitHub identity below.')).toBeTruthy()
+  })
+
+  it('hides the local credential strip once the App is connected', () => {
+    renderView({
+      connection: {
+        ...connectedGithubAppConnection,
+        localCredential: { available: true, login: 'octocat', source: 'gh-cli' },
+      },
+    })
+    expect(screen.queryByText(/via local credentials/)).toBeNull()
+    expect(screen.getByText('Posting as @octocat via Cradle')).toBeTruthy()
   })
 
   it('describes the selected GitHub identity', () => {

@@ -17,6 +17,20 @@ repository, Cradle uses the local `GH_TOKEN`, `GITHUB_TOKEN`, or `gh auth token`
 credential for that repository. An expired or revoked App user connection
 still fails closed and requires reconnection.
 
+## Ambient local credential projection
+
+`local-credential.ts` probes whether an ambient local GitHub credential exists
+(env `GH_TOKEN`/`GITHUB_TOKEN`, or an authenticated gh CLI) and resolves the
+owning login through `gh api user`. The connection projection carries only
+`available` / `login` / `source` so web clients can unlock GitHub-backed
+features without the App user connection. The probe never returns the token
+itself, caches for 30 seconds, and treats network failure during login
+resolution as unknown-login rather than unavailable.
+
+When no App user is connected, GitHub operations run as the ambient local
+credential and appear on GitHub as plain user actions without the Cradle App
+badge.
+
 ## Routes
 
 | Method | Path | Notes |

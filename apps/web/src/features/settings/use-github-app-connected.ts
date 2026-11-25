@@ -17,11 +17,19 @@ export function useGithubAppConnected() {
   })
 
   const connection = query.data ?? null
-  const connected = connection?.state === 'connected' && connection.viewer !== null
+  const appConnected = connection?.state === 'connected' && connection.viewer !== null
+  // The ambient local credential (gh CLI / env token) unlocks GitHub-backed
+  // features only when no App credential exists. An expired or errored App
+  // connection fails closed server-side and requires reconnection or an
+  // explicit disconnect, so it must not be masked by the local fallback.
+  const noAppCredential = connection?.state === 'disconnected' || connection?.state === 'unconfigured'
+  const localCredentialAvailable = noAppCredential && connection?.localCredential?.available === true
 
   return {
     ready: query.isSuccess || query.isError,
-    connected,
+    connected: appConnected || localCredentialAvailable,
+    appConnected,
+    localCredentialAvailable,
     connection,
   }
 }

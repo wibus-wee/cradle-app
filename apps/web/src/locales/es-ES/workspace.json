@@ -51,7 +51,7 @@
   "nav.pullRequests": "Pull requests",
   "nav.disabled": "Desactivado",
   "githubRequired.eyebrow": "Se requiere GitHub",
-  "githubRequired.connectHint": "Conecta tu identidad de GitHub aquí. Cradle desbloqueará esta función en cuanto termine la autorización.",
+  "githubRequired.connectHint": "Conecta tu identidad de GitHub aquí o inicia sesión con la CLI gh en tu terminal: Cradle detecta cualquiera de las dos automáticamente y desbloquea esta función al instante.",
   "githubRequired.pullRequests.title": "Conecta GitHub para usar Pull Requests",
   "githubRequired.pullRequests.description": "Pull Requests carga los PR que creas o revisas en GitHub. Autoriza la GitHub App de Cradle para continuar.",
   "githubRequired.newWork.title": "Conecta GitHub para empezar Work",
