@@ -305,6 +305,7 @@ Ordered by leverage (security/correctness first, structural refactors last).
 | 077  | Bound every server stream producer behind one backpressure seam | P0 | M–L | — (composes with 054/071 recovery) | DONE (bounded primitive + watchdog + close-policy chat streams; HWM-0 deadlock fixed; ratchet in typecheck; codex app-server bridge also bounded (close policy + truncation error frame)) |
 | 078  | Fence Desktop Server fetches to renderer document lifetimes | P0 | M | 075 broker baseline | DONE (isolated runtime acceptance 2026-09-17: 10 reloads → baseline restored, flat external/ArrayBuffer, real kill+respawn re-arms generation fence; respawn wiring gap found & fixed) |
 | 079  | Ship provider runtimes + OCR model as managed downloads, not bundled | P1 | XL | 047, 056, 057 | DONE (.app 1.0 GB → 471 MB measured; codex/claude/OCR all managed) |
+| 080  | Desktop startup performance + memory diet | P1 | XL | — | IN PROGRESS (started 2026-11-25; server empty-boot RSS baseline 370 MB, target <150 MB) |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (one-line reason) | REJECTED (one-line rationale).
 

@@ -514,9 +514,24 @@ export async function deactivateDevelopmentPlugin(pluginName: string): Promise<v
   await prepareAndActivateManifests([shadowed.manifest])
 }
 
+/**
+ * Mount the plugin HTTP surface synchronously, without discovery or activation.
+ *
+ * Elysia freezes its router at listen time — routes added via `app.use()` after
+ * listening return 404 (verified with @elysiajs/node 1.4.x). The plugin route
+ * surface is a catch-all dispatcher that resolves plugins at request time, so
+ * the expensive work (package discovery, web-layer preparation, server-layer
+ * activation) can safely happen after the server is already listening. This
+ * keeps plugin activation off the boot critical path.
+ */
+export function mountPluginRoutes(app: Elysia): void {
+  const staticServer = createPluginStaticServer(() => [...discoveredPluginManifests.values()])
+  app.use(createPluginRoutesElysia(staticServer))
+}
+
 export async function activateServerPlugins(
   app: Elysia,
-  options: { hostServices?: PluginHostServices } = {},
+  options: { hostServices?: PluginHostServices, routesAlreadyMounted?: boolean } = {},
 ): Promise<void> {
   pluginHostServices = options.hostServices
   for (const pluginName of [...activePlugins.keys()]) {
@@ -572,10 +587,16 @@ export async function activateServerPlugins(
     await activatePluginServerLayer(manifest)
   }
 
+  if (options.routesAlreadyMounted) { return }
+
   // Plugin static server — serves web entries + plugin list API
   const staticServer = createPluginStaticServer(() => [...discoveredPluginManifests.values()])
 
-  const pluginRoutes = new Elysia({ prefix: '/api/plugins' })
+  app.use(createPluginRoutesElysia(staticServer))
+}
+
+function createPluginRoutesElysia(staticServer: ReturnType<typeof createPluginStaticServer>): Elysia {
+  return new Elysia({ prefix: '/api/plugins' })
     .get('/', () => staticServer.getPluginList())
     .get('/-/deps/:fileName', ({ params, set }) => {
       const content = staticServer.getSharedDependency(params.fileName)
@@ -614,8 +635,6 @@ export async function activateServerPlugins(
       context,
       `/${context.params['*'] ?? ''}`,
     ))
-
-  app.use(pluginRoutes)
 }
 
 async function registerDiscoveredPackages(packages: PackageWithSource[]): Promise<PluginManifest[]> {

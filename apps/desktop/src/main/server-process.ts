@@ -564,6 +564,10 @@ async function spawnServer(opts: {
     CRADLE_RELAYD_ACCESS_MODE: managedRelay.accessMode,
     ...(managedRelay.pid ? { CRADLE_RELAYD_PID: String(managedRelay.pid) } : {}),
     CRADLE_DESKTOP_PID: String(process.pid),
+    // V8 compile cache: persists compiled bytecode across server restarts.
+    // Measured boot improvement ~25% (717ms → 541ms cold→warm). The cache dir
+    // lives under userData so it survives app updates being keyed by node version.
+    NODE_COMPILE_CACHE: join(app.getPath('userData'), 'node-compile-cache'),
     CRADLE_PLUGINS_DIR: pluginsDir,
     CRADLE_PLUGINS_SOURCE_KIND: pluginsSourceKind,
     CRADLE_EXTERNAL_PLUGINS_DIRS: externalPluginsDirList,

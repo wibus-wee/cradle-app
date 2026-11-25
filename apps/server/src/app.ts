@@ -90,6 +90,7 @@ import { ManagedResourceService } from './modules/managed-resources/service'
 import { mcpServers } from './modules/mcp-servers'
 import { modelRegistry } from './modules/model-registry'
 import { observability } from './modules/observability'
+import { pruneObservabilityEvents } from './modules/observability/service'
 import { opencodeServer } from './modules/opencode-server'
 import { createPluginsModule } from './modules/plugins'
 import { preferences } from './modules/preferences'
@@ -394,7 +395,7 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
       { reconcileExternalIssueSourceRegistrations },
       { providerRuntimeHostManager },
       { clearSideConversations },
-      { activateServerPlugins, deactivateAllPlugins },
+      { activateServerPlugins, deactivateAllPlugins, mountPluginRoutes },
       conversationBridgeSupervisor,
       { destroyWorkspaceFileIndexes },
       { prepareOpencodeManagedPathForRemoval, stopOpencodeServer },
@@ -477,6 +478,15 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
     registerWorkspaceGitIdentityBackfillMaintenance()
     registerCodexResetWatchMaintenance()
     Maintenance.registerTask({
+      ownerNamespace: 'observability',
+      key: 'prune-events',
+      title: 'Prune expired observability events',
+      intervalMs: 60 * 60 * 1000,
+      runOnStart: true,
+      manuallyRunnable: true,
+      run: context => ({ ...pruneObservabilityEvents(context.now, context.deadline) }),
+    })
+    Maintenance.registerTask({
       ownerNamespace: 'logging',
       key: 'rotate-server-log',
       title: 'Rotate server log',
@@ -522,6 +532,7 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
         clearSideConversations,
         activateServerPlugins,
         deactivateAllPlugins,
+        mountPluginRoutes,
         conversationBridgeSupervisor,
         destroyWorkspaceFileIndexes,
         stopOpencodeServer,
@@ -544,6 +555,7 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
     clearSideConversations,
     activateServerPlugins,
     deactivateAllPlugins,
+    mountPluginRoutes,
     conversationBridgeSupervisor,
     destroyWorkspaceFileIndexes,
     stopOpencodeServer,
@@ -553,17 +565,37 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
   } = runtime
 
   await runBootstrapPhase(bootstrapReporter, 'plugin-activation', async () => {
-    await activateServerPlugins(app, {
-      hostServices: {
-        downloadCenter: downloadCenterService,
-        managedResources: managedResourceService,
-        dataDir: serverConfig.dataDir ?? dirname(serverConfig.dbPath),
-      },
-    })
-    await hydrateCustomMcpServers()
-    reconcileExternalIssueSourceRegistrations()
-    const { resumePersistedSessionQueues } = await import('./modules/chat-runtime/runtime')
-    resumePersistedSessionQueues()
+    // Mount the plugin HTTP surface synchronously — Elysia freezes its router at
+    // listen time, and the catch-all dispatcher resolves plugins per-request, so
+    // discovery + activation can finish after the server is already listening.
+    mountPluginRoutes(app)
+
+    const activateAndResume = async () => {
+      await activateServerPlugins(app, {
+        hostServices: {
+          downloadCenter: downloadCenterService,
+          managedResources: managedResourceService,
+          dataDir: serverConfig.dataDir ?? dirname(serverConfig.dbPath),
+        },
+        routesAlreadyMounted: true,
+      })
+      await hydrateCustomMcpServers()
+      // External issue sources are plugin-registered — must run after activation.
+      reconcileExternalIssueSourceRegistrations()
+      const { resumePersistedSessionQueues } = await import('./modules/chat-runtime/runtime')
+      resumePersistedSessionQueues()
+    }
+
+    if (startBackgroundTasks) {
+      // Non-blocking: plugin activation no longer gates listening. Failures are
+      // logged, never fatal — plugins already isolate their own errors.
+      void activateAndResume().catch((error) => {
+        console.error('[plugins] background activation failed:', error)
+      })
+    }
+ else {
+      await activateAndResume()
+    }
   })
 
   const runtimeResources = new RuntimeResourceRegistry()
