@@ -88,13 +88,18 @@ export function initializeRecallProjection(): void {
     })
     recallProjectorRegistered = true
   }
-  reconcileRecallProjection()
+  // Reconciliation runs as maintenance, not synchronously in the boot
+  // path. On a real database the prune leg alone scans recall_tool_events
+  // (potentially hundreds of MB) and better-sqlite3 is synchronous — a boot
+  // time reconcile measured ~900ms of pure event-loop blocking on a 3.2GB
+  // database, dominating startup. runOnStart defers past listen (see
+  // maintenance service), so projection still converges seconds after boot.
   Maintenance.registerTask({
     ownerNamespace: 'recall',
     key: 'reconcile-projection',
     title: 'Reconcile Recall projection',
     intervalMs: 15 * 60 * 1000,
-    runOnStart: false,
+    runOnStart: true,
     manuallyRunnable: true,
     run: () => ({ ...reconcileRecallProjection() }),
   })

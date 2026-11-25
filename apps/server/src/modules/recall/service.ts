@@ -105,10 +105,15 @@ export function projectRecallMessage(
   d: RecallProjectionDb,
   input: RecallMessageProjectionInput,
 ): void {
+  // Select only the columns the projection consumes. chatMessagePayloads
+  // rows carry a message_json overflow chain that averages ~117KB on a real
+  // database; reading it per-row made boot-time reconciliation the dominant
+  // startup phase. `content` is the inline excerpt source — everything the
+  // excerpt needs.
   const row = d
     .select({
       message: messages,
-      payload: chatMessagePayloads,
+      payloadContent: chatMessagePayloads.content,
       workspaceId: sessions.workspaceId,
     })
     .from(messages)
@@ -130,7 +135,7 @@ export function projectRecallMessage(
       status: row.message.status,
       isSidechain: row.message.parentToolCallId ? 1 : 0,
       isMeta: input.isMeta ? 1 : 0,
-      excerpt: truncate(row.payload.content),
+      excerpt: truncate(row.payloadContent),
       occurredAt: row.message.updatedAt,
     })
     .onConflictDoUpdate({
@@ -139,7 +144,7 @@ export function projectRecallMessage(
         status: row.message.status,
         isSidechain: row.message.parentToolCallId ? 1 : 0,
         isMeta: input.isMeta ? 1 : 0,
-        excerpt: truncate(row.payload.content),
+        excerpt: truncate(row.payloadContent),
         occurredAt: row.message.updatedAt,
       },
     })
