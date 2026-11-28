@@ -2,7 +2,7 @@
 
 Provider live catalog HTTP API 与模型列表缓存。
 
-本模块拥有 `/providers` route surface、provider-specific model listing、catalog cache、catalog audit writes，以及 provider list 结果的 capability defaults projection。OpenAI-compatible provider 的 live model discovery 走 provider base URL 下的 OpenAI-compatible `/v1/models` endpoint；本模块不再从 OpenAI-compatible model id 推断 reasoning effort，只保留协议或 registry 显式声明的 `reasoningEfforts`。Universal provider 的 live model discovery 固定走 OpenAI-compatible endpoint，并保留 `universal` descriptor ownership；Anthropic endpoint 只用于 Anthropic provider 自己的 model listing。Registry enrichment 仍由 `model-registry` 拥有，本模块只读取其 mapping/enrichment API。
+本模块拥有 `/providers` route surface、provider-specific model listing、catalog cache、catalog audit writes，以及 provider list 结果的 capability defaults projection。OpenAI-compatible provider 的 live model discovery 走 provider base URL 下的 OpenAI-compatible `/v1/models` endpoint。OpenAI 自己只定义 `id`，但兼作 model catalog 的 gateway（magpie、LiteLLM、vLLM、OpenRouter）会在旁边返回 served-model 事实，因此 inventory 会读取其中已声明的 `display_name`、context window、`modalities`、`reasoning`/reasoning levels、`tool_call` 并投影进 capabilities；registry 仍在其后运行并在知道该模型时覆盖。`service_tiers` 同样进 capabilities，但只保留 OpenAI-compatible wire 能真正请求的 id（`@ai-sdk/openai` 的 provider option 只接受 `auto`/`flex`/`priority`/`default`）：投影一个发不出去的 tier 只会在选择器里放一个静默无效的开关。价格不从 upstream 读取：`cost` 由 registry 拥有，inventory 入库前会剥离它，声明价格会在第一次 cache 往返后消失。本模块不从 OpenAI-compatible model id 推断 reasoning effort，只保留协议、provider 或 registry 显式声明的 `reasoningEfforts`。Universal provider 的 live model discovery 固定走 OpenAI-compatible endpoint，并保留 `universal` descriptor ownership；Anthropic endpoint 只用于 Anthropic provider 自己的 model listing。Registry enrichment 仍由 `model-registry` 拥有，本模块只读取其 mapping/enrichment API。
 
 ## Four-layer contract (Plan 035 M1)
 
@@ -29,7 +29,11 @@ This module owns **Inventory** (layer 1):
     empty result without fetching.
 - `model-cache.ts` owns only inventory persistence and freshness/failure state:
   - `setCachedModelsForTarget` strips all registry-enrichment-derived fields (registryMatch,
-    registryModelId, cost, family, knowledgeCutoff, releaseDate) before persisting.
+    registryModelId, cost, family, knowledgeCutoff, releaseDate) before persisting, and publishes the
+    surviving declared context windows into Model Registry's target-scoped window map in the same step.
+  - `scheduleProviderTargetContextWindowWarmup` republishes those windows from the persisted inventory
+    after listen, so a restarted server's first turn compacts against what each target declared the last
+    time it was listed instead of the models.dev guess or the 128k default.
   - `readCachedModelInventory` returns the raw persisted inventory; enrichment and capability
     projection live in the query pipeline so mapping changes take effect on read without a
     cache invalidation.

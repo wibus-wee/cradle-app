@@ -126,4 +126,83 @@ describe('executeAiSdkTurn', () => {
       reasoningOutputTokens: 0,
     })
   })
+
+  it('forwards the served service tier as the OpenAI request field', async () => {
+    const model = new MockLanguageModelV3({
+      doStream: {
+        stream: simulateReadableStream({
+          chunks: [
+            { type: 'stream-start', warnings: [] },
+            { type: 'text-start', id: '0' },
+            { type: 'text-delta', id: '0', delta: 'fast' },
+            { type: 'text-end', id: '0' },
+            {
+              type: 'finish',
+              finishReason: { unified: 'stop', raw: 'stop' },
+              usage: {
+                inputTokens: { total: 1, noCache: 1, cacheRead: undefined, cacheWrite: undefined },
+                outputTokens: { total: 1, text: 1, reasoning: undefined },
+              },
+            },
+          ],
+          initialDelayInMs: null,
+          chunkDelayInMs: null,
+        }),
+      },
+    })
+
+    for await (const chunk of executeAiSdkTurn({
+      model,
+      messages: [{ role: 'user', content: 'hello' }],
+      providerOptions: { thinkingEffort: 'high' },
+      serviceTier: 'priority',
+    })) {
+      if (chunk.type === 'finish') {
+        break
+      }
+    }
+
+    expect(model.doStreamCalls[0]?.providerOptions).toEqual({
+      openai: {
+        reasoningEffort: 'high',
+        serviceTier: 'priority',
+      },
+    })
+  })
+
+  it('sends no OpenAI provider options when no effort and no tier are set', async () => {
+    const model = new MockLanguageModelV3({
+      doStream: {
+        stream: simulateReadableStream({
+          chunks: [
+            { type: 'stream-start', warnings: [] },
+            { type: 'text-start', id: '0' },
+            { type: 'text-delta', id: '0', delta: 'plain' },
+            { type: 'text-end', id: '0' },
+            {
+              type: 'finish',
+              finishReason: { unified: 'stop', raw: 'stop' },
+              usage: {
+                inputTokens: { total: 1, noCache: 1, cacheRead: undefined, cacheWrite: undefined },
+                outputTokens: { total: 1, text: 1, reasoning: undefined },
+              },
+            },
+          ],
+          initialDelayInMs: null,
+          chunkDelayInMs: null,
+        }),
+      },
+    })
+
+    for await (const chunk of executeAiSdkTurn({
+      model,
+      messages: [{ role: 'user', content: 'hello' }],
+    })) {
+      if (chunk.type === 'finish') {
+        break
+      }
+    }
+
+    expect(model.doStreamCalls[0]?.providerOptions ?? undefined).toBeUndefined()
+  })
 })

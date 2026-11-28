@@ -2,7 +2,13 @@ import { describe, expect, it } from 'vitest'
 
 import type { ModelDescriptor } from '~/features/agent-runtime/types'
 
-import { filterThinkingOptionsForModel, getThinkingCapabilityTier, selectSupportedThinkingValue, THINKING_EFFORTS } from './constants'
+import {
+  filterThinkingOptionsForModel,
+  getThinkingCapabilityTier,
+  modelSupportsFastServiceTier,
+  selectSupportedThinkingValue,
+  THINKING_EFFORTS,
+} from './constants'
 
 function model(overrides: Partial<ModelDescriptor> & { id: string }): ModelDescriptor {
   return {
@@ -12,6 +18,28 @@ function model(overrides: Partial<ModelDescriptor> & { id: string }): ModelDescr
     capabilities: overrides.capabilities ?? {},
   }
 }
+
+describe('fast service tier availability', () => {
+  it('offers fast mode only when the model declares the fast tier', () => {
+    expect(modelSupportsFastServiceTier(model({
+      id: 'codex/gpt-6.2-sol',
+      capabilities: { serviceTiers: [{ id: 'priority', name: 'Fast' }] },
+    }))).toBe(true)
+
+    expect(modelSupportsFastServiceTier(model({
+      id: 'opencode-go/deepseek-v4-pro',
+      capabilities: { serviceTiers: [] },
+    }))).toBe(false)
+
+    // A descriptor without the field cannot prove support.
+    expect(modelSupportsFastServiceTier(model({
+      id: 'bare/model',
+      capabilities: {},
+    }))).toBe(false)
+
+    expect(modelSupportsFastServiceTier(null)).toBe(false)
+  })
+})
 
 describe('thinking capability filtering', () => {
   it('does not infer extended thinking from model names', () => {

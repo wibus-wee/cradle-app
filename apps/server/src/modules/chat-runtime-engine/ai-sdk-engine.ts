@@ -45,6 +45,12 @@ export interface AiSdkEngineInput {
   }) => void
   /** Context window of the model in tokens (for auto-compaction) */
   contextWindow?: number
+  /**
+   * Served service tier to request, e.g. `priority`. The caller resolves it
+   * against what the provider actually declared for this model; the engine only
+   * forwards it as the OpenAI `service_tier` request field.
+   */
+  serviceTier?: string
   /** Compaction strategy: 'window' drops old messages, 'summarize' generates a summary first */
   compactionStrategy?: 'window' | 'summarize'
   /** Optional budget limits for cost control */
@@ -71,6 +77,7 @@ function createAiSdkStreamResult(input: AiSdkEngineInput): {
     abortController,
     onStepFinish,
     contextWindow,
+    serviceTier,
     compactionStrategy = 'window',
     budgetConfig,
     onBudgetExceeded,
@@ -80,12 +87,15 @@ function createAiSdkStreamResult(input: AiSdkEngineInput): {
 
   const effectiveAbortSignal = abortController?.signal ?? abortSignal
   const reasoningEffort = readOpenAiReasoningEffort(input.providerOptions?.thinkingEffort)
-  const providerOptions = reasoningEffort
-    ? {
-        openai: {
-          reasoningEffort,
-        },
-      }
+  const openAiProviderOptions: Record<string, string> = {}
+  if (reasoningEffort) {
+    openAiProviderOptions.reasoningEffort = reasoningEffort
+  }
+  if (serviceTier) {
+    openAiProviderOptions.serviceTier = serviceTier
+  }
+  const providerOptions = Object.keys(openAiProviderOptions).length > 0
+    ? { openai: openAiProviderOptions }
     : undefined
   let accumulatedTurnCost = 0
 

@@ -19,6 +19,17 @@ export interface ProviderRequest {
   sourceApp: string | null
 }
 
+/**
+ * A served service tier a provider declares for one model, e.g. an OpenAI
+ * `priority` tier or a gateway's own faster lane. The ids are the upstream
+ * wire values, because they are sent back verbatim.
+ */
+export interface ModelServiceTier {
+  id: string
+  name: string
+  description?: string
+}
+
 export interface ModelCapabilities {
   contextWindow?: number
   maxOutput?: number
@@ -26,6 +37,8 @@ export interface ModelCapabilities {
   outputModalities?: string[]
   reasoning?: boolean
   reasoningEfforts?: Array<'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra'>
+  /** Service tiers this model may be served at; empty means "only the default". */
+  serviceTiers?: ModelServiceTier[]
   toolCall?: boolean
   temperature?: boolean
   structuredOutput?: boolean
