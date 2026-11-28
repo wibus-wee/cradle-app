@@ -5,6 +5,7 @@ import type { AbsolutePathBuf } from "../AbsolutePathBuf";
 import type { ReasoningEffort } from "../ReasoningEffort";
 import type { GitInfo } from "./GitInfo";
 import type { SessionSource } from "./SessionSource";
+import type { ThreadEnvironment } from "./ThreadEnvironment";
 import type { ThreadExtra } from "./ThreadExtra";
 import type { ThreadHistoryMode } from "./ThreadHistoryMode";
 import type { ThreadSection } from "./ThreadSection";
@@ -18,6 +19,12 @@ export type Thread = {
  */
 id: string,
 /**
+ * Current environments for a loaded thread, in priority order, primary first.
+ * `null` means the thread is not loaded or the server does not expose its selection.
+ * An empty list means no environments are selected. This does not report connection status.
+ */
+environments: Array<ThreadEnvironment> | null,
+/**
  * Optional implementation-specific thread data.
  */
 extra: ThreadExtra | null,
@@ -29,6 +36,10 @@ sessionId: string,
  * Source thread id when this thread was created by forking another thread.
  */
 forkedFromId: string | null,
+/**
+ * Parent that owns this persisted attached thread, independent of fork or spawn lineage.
+ */
+attachedToThreadId: string | null,
 /**
  * The ID of the parent thread. This will only be set if this thread is a subagent.
  */
@@ -100,6 +111,11 @@ cwd: AbsolutePathBuf,
  */
 cliVersion: string,
 /**
+ * Originator recorded when the thread was created, independent of its current client or executor.
+ * Null when the recorded originator is unavailable.
+ */
+originator: string | null,
+/**
  * Origin of the thread (CLI, VSCode, codex exec, codex app-server, etc.).
  */
 source: SessionSource,
@@ -129,7 +145,16 @@ gitInfo: GitInfo | null,
  */
 name: string | null,
 /**
- * Only populated on `thread/resume`, `thread/rollback`, `thread/fork`, and `thread/read`
+ * Saved Daybreak choice, independent of turn execution. Null if unset.
+ */
+daybreakEnabled: boolean | null,
+/**
+ * Whether the live thread joined the Daybreak propagation experiment at startup.
+ * Null when only stored metadata is available. Older servers can omit this field.
+ */
+daybreakProgramPropagationEnrolled: boolean | null,
+/**
+ * Only populated on `thread/resume`, `thread/fork`, and `thread/read`
  * (when `includeTurns` is true) responses.
  * For all other responses and notifications returning a Thread,
  * the turns field will be an empty list.

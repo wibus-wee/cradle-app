@@ -9,12 +9,24 @@ import type { ReasoningSummary } from "../ReasoningSummary";
 import type { ApprovalsReviewer } from "./ApprovalsReviewer";
 import type { AskForApproval } from "./AskForApproval";
 import type { SandboxPolicy } from "./SandboxPolicy";
+import type { TurnEnvironmentParams } from "./TurnEnvironmentParams";
 
 export type ThreadSettingsUpdateParams = { threadId: string,
+/**
+ * Replace this thread's disabled plugin IDs.
+ * Omitted/null preserves the list; [] clears it.
+ */
+disabledPluginIds?: Array<string> | null,
 /**
  * Override the working directory for subsequent turns.
  */
 cwd?: string | null,
+/**
+ * Replace the environments for future turns without changing the running turn.
+ * Omitted/null preserves the selection unless `cwd` is also provided, which selects
+ * the default environments for that directory. [] clears the selection.
+ */
+environments?: Array<TurnEnvironmentParams> | null,
 /**
  * Override the approval policy for subsequent turns.
  */
@@ -61,6 +73,7 @@ collaborationMode?: CollaborationMode | null,
  */
 multiAgentMode?: MultiAgentMode | null,
 /**
- * Override the personality for subsequent turns.
+ * @deprecated `friendly` and `pragmatic` no longer select a style.
+ * Changing this does not rewrite the thread's existing instructions.
  */
 personality?: Personality | null, };

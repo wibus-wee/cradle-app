@@ -4,8 +4,8 @@ import * as z from 'zod';
 
 import { type Client, type ClientMeta, formDataBodySerializer, type Options as Options2, type RequestResult, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { ActivateSkillData, ActivateSkillResponses, CloseTerminalData, CloseTerminalResponses, CreateProviderData, CreateProviderResponses, DeleteApiV1FilesByFileIdData, DeleteApiV1FilesByFileIdResponses, DeleteApiV1OauthLoginData, DeleteApiV1OauthLoginResponses, DeleteApiV1WorkspacesByWorkspaceIdData, DeleteApiV1WorkspacesByWorkspaceIdResponses, DeleteApiV2McpServersByNameData, DeleteApiV2McpServersByNameResponses, DeleteProviderData, DeleteProviderResponses, DownloadFileData, DownloadFileResponses, FsActionData, FsActionResponses, FsBrowseData, FsBrowseResponses, FsContentData, FsContentResponses, FsHomeData, FsHomeResponses, FsMkdirData, FsMkdirResponses, FsSuggestData, FsSuggestResponses, GetApiV1AuthData, GetApiV1AuthResponses, GetApiV1ConfigData, GetApiV1ConfigResponses, GetApiV1ConnectionsData, GetApiV1ConnectionsResponses, GetApiV1FilesByFileIdData, GetApiV1FilesByFileIdErrors, GetApiV1FilesByFileIdResponses, GetApiV1GuiStoreGetItemData, GetApiV1GuiStoreGetItemResponses, GetApiV1GuiStoreLengthData, GetApiV1GuiStoreLengthResponses, GetApiV1HealthzData, GetApiV1HealthzResponses, GetApiV1McpServersData, GetApiV1McpServersResponses, GetApiV1MetaData, GetApiV1MetaResponses, GetApiV1ModelsData, GetApiV1ModelsResponses, GetApiV1OauthLoginData, GetApiV1OauthLoginResponses, GetApiV1OauthRegionData, GetApiV1OauthRegionResponses, GetApiV1OauthUsageData, GetApiV1OauthUsageResponses, GetApiV1OauthUserinfoData, GetApiV1OauthUserinfoResponses, GetApiV1ProvidersByProviderIdData, GetApiV1ProvidersByProviderIdResponses, GetApiV1ProvidersData, GetApiV1ProvidersResponses, GetApiV1SessionsBySessionIdApprovalsData, GetApiV1SessionsBySessionIdApprovalsResponses, GetApiV1SessionsBySessionIdChildrenData, GetApiV1SessionsBySessionIdChildrenResponses, GetApiV1SessionsBySessionIdData, GetApiV1SessionsBySessionIdFileHistoryChangesData, GetApiV1SessionsBySessionIdFileHistoryChangesResponses, GetApiV1SessionsBySessionIdFileHistoryContentData, GetApiV1SessionsBySessionIdFileHistoryContentResponses, GetApiV1SessionsBySessionIdGoalData, GetApiV1SessionsBySessionIdGoalResponses, GetApiV1SessionsBySessionIdMediaByFileIdData, GetApiV1SessionsBySessionIdMediaByFileIdResponses, GetApiV1SessionsBySessionIdMessagesByMessageIdData, GetApiV1SessionsBySessionIdMessagesByMessageIdResponses, GetApiV1SessionsBySessionIdMessagesData, GetApiV1SessionsBySessionIdMessagesResponses, GetApiV1SessionsBySessionIdProfileData, GetApiV1SessionsBySessionIdProfileResponses, GetApiV1SessionsBySessionIdQuestionsData, GetApiV1SessionsBySessionIdQuestionsResponses, GetApiV1SessionsBySessionIdResponses, GetApiV1SessionsBySessionIdRuntimeData, GetApiV1SessionsBySessionIdRuntimeResponses, GetApiV1SessionsBySessionIdSnapshotData, GetApiV1SessionsBySessionIdSnapshotResponses, GetApiV1SessionsBySessionIdStatusData, GetApiV1SessionsBySessionIdStatusResponses, GetApiV1SessionsBySessionIdTasksByTaskIdData, GetApiV1SessionsBySessionIdTasksByTaskIdResponses, GetApiV1SessionsBySessionIdTasksData, GetApiV1SessionsBySessionIdTasksResponses, GetApiV1SessionsBySessionIdTerminalsByTerminalIdData, GetApiV1SessionsBySessionIdTerminalsByTerminalIdResponses, GetApiV1SessionsBySessionIdTerminalsData, GetApiV1SessionsBySessionIdTerminalsResponses, GetApiV1SessionsBySessionIdTranscriptData, GetApiV1SessionsBySessionIdTranscriptOpsData, GetApiV1SessionsBySessionIdTranscriptOpsResponses, GetApiV1SessionsBySessionIdTranscriptPlanData, GetApiV1SessionsBySessionIdTranscriptPlanResponses, GetApiV1SessionsBySessionIdTranscriptResponses, GetApiV1SessionsBySessionIdTranscriptUserMessagesData, GetApiV1SessionsBySessionIdTranscriptUserMessagesResponses, GetApiV1SessionsBySessionIdWarningsData, GetApiV1SessionsBySessionIdWarningsResponses, GetApiV1SessionsData, GetApiV1SessionsResponses, GetApiV1ToolsData, GetApiV1ToolsResponses, GetApiV1WorkspacesByWorkspaceIdTrustData, GetApiV1WorkspacesByWorkspaceIdTrustResponses, GetApiV1WorkspacesData, GetApiV1WorkspacesResponses, GetApiV2McpAuthStatusesData, GetApiV2McpAuthStatusesResponses, GetApiV2McpServersByNameData, GetApiV2McpServersByNameResponses, GetApiV2McpServersData, GetApiV2McpServersResponses, GetApiV2SessionsData, GetApiV2SessionsResponses, GetAsyncapiJsonData, GetAsyncapiJsonResponses, GetBy__Data, GetBy__Responses, GetCapabilityData, GetCapabilityResponses, GetCatalogProviderData, GetCatalogProviderResponses, GetData, GetOpenapiJsonData, GetOpenapiJsonResponses, GetResponses, InstallCapabilityData, InstallCapabilityResponses, InstallPluginData, InstallPluginResponses, ListCapabilitiesData, ListCapabilitiesResponses, ListCatalogProvidersData, ListCatalogProvidersResponses, ListPluginMarketplaceData, ListPluginMarketplaceResponses, ListPluginsData, ListPluginsResponses, ListPromptsData, ListPromptsResponses, ListSkillsData, ListSkillsResponses, ListWorkspaceSkillsData, ListWorkspaceSkillsResponses, PatchApiV1WorkspacesByWorkspaceIdData, PatchApiV1WorkspacesByWorkspaceIdResponses, PluginActionData, PluginActionResponses, PostApiV1ConfigData, PostApiV1ConfigResponses, PostApiV1FilesData, PostApiV1FilesResponses, PostApiV1GuiStoreClearData, PostApiV1GuiStoreClearResponses, PostApiV1GuiStoreRemoveItemData, PostApiV1GuiStoreRemoveItemResponses, PostApiV1GuiStoreSetItemData, PostApiV1GuiStoreSetItemResponses, PostApiV1OauthLoginData, PostApiV1OauthLoginResponses, PostApiV1OauthLogoutData, PostApiV1OauthLogoutResponses, PostApiV1SearchData, PostApiV1SearchResponses, PostApiV1SessionsBySessionIdApprovalsByApprovalIdData, PostApiV1SessionsBySessionIdApprovalsByApprovalIdResponses, PostApiV1SessionsBySessionIdChildrenData, PostApiV1SessionsBySessionIdChildrenResponses, PostApiV1SessionsBySessionIdExportData, PostApiV1SessionsBySessionIdExportResponses, PostApiV1SessionsBySessionIdProfileData, PostApiV1SessionsBySessionIdProfileResponses, PostApiV1SessionsBySessionIdQuestionsByTailData, PostApiV1SessionsBySessionIdQuestionsByTailResponses, PostApiV1SessionsBySessionIdRuntimeData, PostApiV1SessionsBySessionIdRuntimeResponses, PostApiV1SessionsBySessionIdTerminalsData, PostApiV1SessionsBySessionIdTerminalsResponses, PostApiV1SessionsBySessionIdTitleGenerateData, PostApiV1SessionsBySessionIdTitleGenerateResponses, PostApiV1SessionsData, PostApiV1SessionsResponses, PostApiV1ShutdownData, PostApiV1ShutdownResponses, PostApiV1WorkspacesByWorkspaceIdAddDirData, PostApiV1WorkspacesByWorkspaceIdAddDirResponses, PostApiV1WorkspacesByWorkspaceIdTrustData, PostApiV1WorkspacesByWorkspaceIdTrustResponses, PostApiV1WorkspacesByWorkspaceIdUntrustData, PostApiV1WorkspacesByWorkspaceIdUntrustResponses, PostApiV1WorkspacesData, PostApiV1WorkspacesResponses, PostApiV2McpAuthBeginData, PostApiV2McpAuthBeginResponses, PostApiV2McpAuthCancelData, PostApiV2McpAuthCancelResponses, PostApiV2McpAuthCompleteData, PostApiV2McpAuthCompleteResponses, PostApiV2McpAuthResetData, PostApiV2McpAuthResetResponses, PostApiV2McpServersData, PostApiV2McpServersInspectData, PostApiV2McpServersInspectResponses, PostApiV2McpServersResponses, PostApiV2McpServersTestData, PostApiV2McpServersTestResponses, PostApiV2SessionsArchiveData, PostApiV2SessionsArchiveResponses, PostApiV2SessionsRestoreData, PostApiV2SessionsRestoreResponses, PromptActionData, PromptActionResponses, ProviderCollectionActionData, ProviderCollectionActionResponses, PutApiV2McpServersByNameData, PutApiV2McpServersByNameResponses, RefreshProviderData, RefreshProviderResponses, ReplaceProviderData, ReplaceProviderResponses, RestartMcpServerData, RestartMcpServerResponses, RunSessionArchiveActionData, RunSessionArchiveActionResponses, RunTaskActionData, RunTaskActionResponses, SetDefaultModelData, SetDefaultModelResponses, SteerPromptsData, SteerPromptsResponses, SubmitPromptData, SubmitPromptResponses, WorkspaceFsSearchData, WorkspaceFsSearchResponses, WorkspaceFsSuggestData, WorkspaceFsSuggestResponses } from './types.gen';
-import { zActivateSkillBody, zActivateSkillPath, zCloseTerminalPath, zCreateProviderBody, zDeleteApiV1FilesByFileIdPath, zDeleteApiV1OauthLoginQuery, zDeleteApiV1WorkspacesByWorkspaceIdPath, zDeleteApiV2McpServersByNamePath, zDeleteApiV2McpServersByNameQuery, zDeleteProviderPath, zDownloadFilePath, zDownloadFileQuery, zFsActionBody, zFsActionPath, zFsBrowseQuery, zFsContentQuery, zFsMkdirBody, zFsSuggestBody, zGetApiV1FilesByFileIdPath, zGetApiV1GuiStoreGetItemQuery, zGetApiV1OauthLoginQuery, zGetApiV1OauthUsageQuery, zGetApiV1OauthUserinfoQuery, zGetApiV1ProvidersByProviderIdPath, zGetApiV1SessionsBySessionIdApprovalsPath, zGetApiV1SessionsBySessionIdApprovalsQuery, zGetApiV1SessionsBySessionIdChildrenPath, zGetApiV1SessionsBySessionIdChildrenQuery, zGetApiV1SessionsBySessionIdFileHistoryChangesPath, zGetApiV1SessionsBySessionIdFileHistoryChangesQuery, zGetApiV1SessionsBySessionIdFileHistoryContentPath, zGetApiV1SessionsBySessionIdFileHistoryContentQuery, zGetApiV1SessionsBySessionIdGoalPath, zGetApiV1SessionsBySessionIdMediaByFileIdPath, zGetApiV1SessionsBySessionIdMessagesByMessageIdPath, zGetApiV1SessionsBySessionIdMessagesPath, zGetApiV1SessionsBySessionIdMessagesQuery, zGetApiV1SessionsBySessionIdPath, zGetApiV1SessionsBySessionIdProfilePath, zGetApiV1SessionsBySessionIdQuestionsPath, zGetApiV1SessionsBySessionIdQuestionsQuery, zGetApiV1SessionsBySessionIdRuntimePath, zGetApiV1SessionsBySessionIdSnapshotPath, zGetApiV1SessionsBySessionIdStatusPath, zGetApiV1SessionsBySessionIdTasksByTaskIdPath, zGetApiV1SessionsBySessionIdTasksByTaskIdQuery, zGetApiV1SessionsBySessionIdTasksPath, zGetApiV1SessionsBySessionIdTasksQuery, zGetApiV1SessionsBySessionIdTerminalsByTerminalIdPath, zGetApiV1SessionsBySessionIdTerminalsPath, zGetApiV1SessionsBySessionIdTranscriptOpsPath, zGetApiV1SessionsBySessionIdTranscriptOpsQuery, zGetApiV1SessionsBySessionIdTranscriptPath, zGetApiV1SessionsBySessionIdTranscriptPlanPath, zGetApiV1SessionsBySessionIdTranscriptPlanQuery, zGetApiV1SessionsBySessionIdTranscriptQuery, zGetApiV1SessionsBySessionIdTranscriptUserMessagesPath, zGetApiV1SessionsBySessionIdTranscriptUserMessagesQuery, zGetApiV1SessionsBySessionIdWarningsPath, zGetApiV1SessionsQuery, zGetApiV1ToolsQuery, zGetApiV1WorkspacesByWorkspaceIdTrustPath, zGetApiV2McpAuthStatusesQuery, zGetApiV2McpServersByNamePath, zGetApiV2McpServersByNameQuery, zGetApiV2McpServersQuery, zGetApiV2SessionsQuery, zGetBy__Path, zGetCapabilityPath, zGetCatalogProviderPath, zInstallCapabilityPath, zInstallPluginBody, zListPromptsPath, zListSkillsPath, zListWorkspaceSkillsPath, zPatchApiV1WorkspacesByWorkspaceIdBody, zPatchApiV1WorkspacesByWorkspaceIdPath, zPluginActionPath, zPostApiV1ConfigBody, zPostApiV1FilesBody, zPostApiV1GuiStoreRemoveItemBody, zPostApiV1GuiStoreSetItemBody, zPostApiV1OauthLoginBody, zPostApiV1OauthLogoutBody, zPostApiV1SearchBody, zPostApiV1SessionsBody, zPostApiV1SessionsBySessionIdApprovalsByApprovalIdBody, zPostApiV1SessionsBySessionIdApprovalsByApprovalIdPath, zPostApiV1SessionsBySessionIdChildrenBody, zPostApiV1SessionsBySessionIdChildrenPath, zPostApiV1SessionsBySessionIdExportBody, zPostApiV1SessionsBySessionIdExportPath, zPostApiV1SessionsBySessionIdProfileBody, zPostApiV1SessionsBySessionIdProfilePath, zPostApiV1SessionsBySessionIdQuestionsByTailBody, zPostApiV1SessionsBySessionIdQuestionsByTailPath, zPostApiV1SessionsBySessionIdRuntimeBody, zPostApiV1SessionsBySessionIdRuntimePath, zPostApiV1SessionsBySessionIdTerminalsBody, zPostApiV1SessionsBySessionIdTerminalsPath, zPostApiV1SessionsBySessionIdTitleGenerateBody, zPostApiV1SessionsBySessionIdTitleGeneratePath, zPostApiV1WorkspacesBody, zPostApiV1WorkspacesByWorkspaceIdAddDirBody, zPostApiV1WorkspacesByWorkspaceIdAddDirPath, zPostApiV1WorkspacesByWorkspaceIdTrustPath, zPostApiV1WorkspacesByWorkspaceIdUntrustPath, zPostApiV2McpAuthBeginBody, zPostApiV2McpAuthBeginQuery, zPostApiV2McpAuthCancelBody, zPostApiV2McpAuthCompleteBody, zPostApiV2McpAuthResetBody, zPostApiV2McpAuthResetQuery, zPostApiV2McpServersBody, zPostApiV2McpServersInspectBody, zPostApiV2McpServersQuery, zPostApiV2McpServersTestBody, zPostApiV2SessionsArchiveBody, zPostApiV2SessionsRestoreBody, zPromptActionPath, zProviderCollectionActionBody, zProviderCollectionActionPath, zPutApiV2McpServersByNameBody, zPutApiV2McpServersByNamePath, zPutApiV2McpServersByNameQuery, zRefreshProviderPath, zReplaceProviderBody, zReplaceProviderPath, zRestartMcpServerPath, zRunSessionArchiveActionBody, zRunSessionArchiveActionPath, zRunTaskActionPath, zSetDefaultModelPath, zSteerPromptsBody, zSteerPromptsPath, zSubmitPromptBody, zSubmitPromptPath, zWorkspaceFsSearchBody, zWorkspaceFsSuggestBody } from './zod.gen';
+import type { ActivateSkillData, ActivateSkillResponses, CreateProviderData, CreateProviderResponses, DeleteApiV1FilesByFileIdData, DeleteApiV1FilesByFileIdResponses, DeleteApiV1HostsByIdData, DeleteApiV1HostsByIdProxyBy__Data, DeleteApiV1HostsByIdProxyBy__Responses, DeleteApiV1HostsByIdProxyData, DeleteApiV1HostsByIdProxyResponses, DeleteApiV1HostsByIdResponses, DeleteApiV1McpServersByNameData, DeleteApiV1McpServersByNameResponses, DeleteApiV1OauthLoginData, DeleteApiV1OauthLoginResponses, DeleteApiV1RemoteControlDevicesByIdData, DeleteApiV1RemoteControlDevicesByIdResponses, DeleteApiV1WorkspacesByWorkspaceIdData, DeleteApiV1WorkspacesByWorkspaceIdResponses, DeleteProviderData, DeleteProviderResponses, DownloadFileData, DownloadFileErrors, DownloadFileResponses, FsActionData, FsActionResponses, FsBrowseData, FsBrowseResponses, FsContentData, FsContentErrors, FsContentResponses, FsHomeData, FsHomeResponses, FsMkdirData, FsMkdirResponses, FsSuggestData, FsSuggestResponses, GetApiV1AuthData, GetApiV1AuthResponses, GetApiV1ConfigData, GetApiV1ConfigResponses, GetApiV1FilesByFileIdData, GetApiV1FilesByFileIdErrors, GetApiV1FilesByFileIdResponses, GetApiV1HealthzData, GetApiV1HealthzResponses, GetApiV1HostsByIdProxyBy__Data, GetApiV1HostsByIdProxyBy__Responses, GetApiV1HostsByIdProxyData, GetApiV1HostsByIdProxyResponses, GetApiV1HostsData, GetApiV1HostsResponses, GetApiV1HostsSshHostsData, GetApiV1HostsSshHostsResponses, GetApiV1McpAuthStatusesData, GetApiV1McpAuthStatusesResponses, GetApiV1McpServersByNameData, GetApiV1McpServersByNameResponses, GetApiV1McpServersData, GetApiV1McpServersResponses, GetApiV1MetaData, GetApiV1MetaResponses, GetApiV1ModelsData, GetApiV1ModelsResponses, GetApiV1OauthLoginData, GetApiV1OauthLoginResponses, GetApiV1OauthRegionData, GetApiV1OauthRegionResponses, GetApiV1OauthUsageData, GetApiV1OauthUsageResponses, GetApiV1OauthUserinfoData, GetApiV1OauthUserinfoResponses, GetApiV1ProvidersByProviderIdData, GetApiV1ProvidersByProviderIdResponses, GetApiV1ProvidersData, GetApiV1ProvidersResponses, GetApiV1RemoteControlData, GetApiV1RemoteControlDevicesData, GetApiV1RemoteControlDevicesResponses, GetApiV1RemoteControlResponses, GetApiV1SessionsBySessionIdAgentsByAgentIdTurnsData, GetApiV1SessionsBySessionIdAgentsByAgentIdTurnsResponses, GetApiV1SessionsBySessionIdContextItemsByItemIdData, GetApiV1SessionsBySessionIdContextItemsByItemIdResponses, GetApiV1SessionsBySessionIdContextItemsData, GetApiV1SessionsBySessionIdContextItemsResponses, GetApiV1SessionsBySessionIdContextSummaryData, GetApiV1SessionsBySessionIdContextSummaryResponses, GetApiV1SessionsBySessionIdData, GetApiV1SessionsBySessionIdEnvironmentData, GetApiV1SessionsBySessionIdEnvironmentResponses, GetApiV1SessionsBySessionIdEnvironmentsData, GetApiV1SessionsBySessionIdEnvironmentsResponses, GetApiV1SessionsBySessionIdFileHistoryChangesData, GetApiV1SessionsBySessionIdFileHistoryChangesResponses, GetApiV1SessionsBySessionIdFileHistoryContentData, GetApiV1SessionsBySessionIdFileHistoryContentResponses, GetApiV1SessionsBySessionIdMediaByFileIdData, GetApiV1SessionsBySessionIdMediaByFileIdResponses, GetApiV1SessionsBySessionIdResponses, GetApiV1SessionsBySessionIdWarningsData, GetApiV1SessionsBySessionIdWarningsResponses, GetApiV1SessionsData, GetApiV1SessionsResponses, GetApiV1ToolsData, GetApiV1ToolsResponses, GetApiV1WorkspacesByWorkspaceIdTrustData, GetApiV1WorkspacesByWorkspaceIdTrustResponses, GetApiV1WorkspacesData, GetApiV1WorkspacesProjectConfigDirsData, GetApiV1WorkspacesProjectConfigDirsResponses, GetApiV1WorkspacesResponses, GetAsyncapiJsonData, GetAsyncapiJsonResponses, GetBy__Data, GetBy__Responses, GetCapabilityData, GetCapabilityResponses, GetCatalogProviderData, GetCatalogProviderResponses, GetData, GetKapSpecData, GetKapSpecResponses, GetOpenapiJsonData, GetOpenapiJsonResponses, GetPluginInfoData, GetPluginInfoResponses, GetResponses, HeadApiV1HostsByIdProxyBy__Data, HeadApiV1HostsByIdProxyBy__Responses, HeadApiV1HostsByIdProxyData, HeadApiV1HostsByIdProxyResponses, InstallCapabilityData, InstallCapabilityResponses, InstallPluginData, InstallPluginResponses, ListCapabilitiesData, ListCapabilitiesResponses, ListCatalogProvidersData, ListCatalogProvidersResponses, ListPluginMarketplaceData, ListPluginMarketplaceResponses, ListPluginsData, ListPluginsResponses, ListPromptsData, ListPromptsResponses, ListSessionInteractionsData, ListSessionInteractionsResponses, ListSkillsData, ListSkillsResponses, ListWorkspaceSkillsData, ListWorkspaceSkillsResponses, PatchApiV1FeedbackByFeedbackIdData, PatchApiV1FeedbackByFeedbackIdResponses, PatchApiV1HostsByIdProxyBy__Data, PatchApiV1HostsByIdProxyBy__Responses, PatchApiV1HostsByIdProxyData, PatchApiV1HostsByIdProxyResponses, PatchApiV1RemoteControlDevicesByIdData, PatchApiV1RemoteControlDevicesByIdResponses, PatchApiV1WorkspacesByWorkspaceIdData, PatchApiV1WorkspacesByWorkspaceIdResponses, PluginActionData, PluginActionResponses, PostApiV1ConfigData, PostApiV1ConfigResponses, PostApiV1FeedbackByFeedbackIdAttachmentsData, PostApiV1FeedbackByFeedbackIdAttachmentsResponses, PostApiV1FeedbackByFeedbackIdAttachmentsSessionData, PostApiV1FeedbackByFeedbackIdAttachmentsSessionResponses, PostApiV1FeedbackData, PostApiV1FeedbackResponses, PostApiV1FeedbackSessionArchivesData, PostApiV1FeedbackSessionArchivesResponses, PostApiV1FilesData, PostApiV1FilesResponses, PostApiV1HostsByIdProxyBy__Data, PostApiV1HostsByIdProxyBy__Responses, PostApiV1HostsByIdProxyData, PostApiV1HostsByIdProxyResponses, PostApiV1HostsConnectData, PostApiV1HostsConnectResponses, PostApiV1HostsCopyProvidersData, PostApiV1HostsCopyProvidersResponses, PostApiV1HostsTestData, PostApiV1HostsTestResponses, PostApiV1McpAuthBeginData, PostApiV1McpAuthBeginResponses, PostApiV1McpAuthCancelData, PostApiV1McpAuthCancelResponses, PostApiV1McpAuthCompleteData, PostApiV1McpAuthCompleteResponses, PostApiV1McpAuthResetData, PostApiV1McpAuthResetResponses, PostApiV1McpServersData, PostApiV1McpServersInspectData, PostApiV1McpServersInspectResponses, PostApiV1McpServersResponses, PostApiV1McpServersTestData, PostApiV1McpServersTestResponses, PostApiV1OauthLoginData, PostApiV1OauthLoginResponses, PostApiV1OauthLogoutData, PostApiV1OauthLogoutResponses, PostApiV1RemoteControlData, PostApiV1RemoteControlDevicesByIdDeactivateData, PostApiV1RemoteControlDevicesByIdDeactivateResponses, PostApiV1RemoteControlResponses, PostApiV1SearchData, PostApiV1SearchResponses, PostApiV1SessionsArchiveData, PostApiV1SessionsArchiveResponses, PostApiV1SessionsBySessionIdExportData, PostApiV1SessionsBySessionIdExportResponses, PostApiV1SessionsBySessionIdInteractionsByInteractionIdData, PostApiV1SessionsBySessionIdInteractionsByInteractionIdResponses, PostApiV1SessionsBySessionIdProfileData, PostApiV1SessionsBySessionIdProfileResponses, PostApiV1SessionsBySessionIdRatingData, PostApiV1SessionsBySessionIdRatingResponses, PostApiV1SessionsBySessionIdTitleGenerateData, PostApiV1SessionsBySessionIdTitleGenerateResponses, PostApiV1SessionsData, PostApiV1SessionsResponses, PostApiV1SessionsRestoreData, PostApiV1SessionsRestoreResponses, PostApiV1ShutdownData, PostApiV1ShutdownResponses, PostApiV1WorkspacesByWorkspaceIdPrimaryData, PostApiV1WorkspacesByWorkspaceIdPrimaryResponses, PostApiV1WorkspacesByWorkspaceIdTrustData, PostApiV1WorkspacesByWorkspaceIdTrustResponses, PostApiV1WorkspacesByWorkspaceIdUntrustData, PostApiV1WorkspacesByWorkspaceIdUntrustResponses, PostApiV1WorkspacesData, PostApiV1WorkspacesResponses, PreviewPluginData, PreviewPluginResponses, PromptActionData, PromptActionResponses, ProviderCollectionActionData, ProviderCollectionActionResponses, PutApiV1HostsByIdData, PutApiV1HostsByIdProxyBy__Data, PutApiV1HostsByIdProxyBy__Responses, PutApiV1HostsByIdProxyData, PutApiV1HostsByIdProxyResponses, PutApiV1HostsByIdResponses, PutApiV1McpServersByNameData, PutApiV1McpServersByNameResponses, RefreshProviderData, RefreshProviderResponses, ReplaceProviderData, ReplaceProviderResponses, RunAgentCloseActionData, RunAgentCloseActionResponses, RunSessionArchiveActionData, RunSessionArchiveActionResponses, RunSessionCancelActionData, RunSessionCancelActionResponses, RunSessionContinueActionData, RunSessionContinueActionResponses, RunSessionDeleteActionData, RunSessionDeleteActionResponses, RunSessionReloadActionData, RunSessionReloadActionResponses, RunSessionTakeoverActionData, RunSessionTakeoverActionResponses, RunSessionWaitActionData, RunSessionWaitActionResponses, SetDefaultModelData, SetDefaultModelResponses, SteerPromptContentData, SteerPromptContentResponses, SteerPromptsData, SteerPromptsResponses, SubmitPromptData, SubmitPromptResponses, WorkspaceFsListData, WorkspaceFsListResponses, WorkspaceFsSearchData, WorkspaceFsSearchResponses, WorkspaceFsSuggestData, WorkspaceFsSuggestResponses, WriteFsContentData, WriteFsContentErrors, WriteFsContentResponses } from './types.gen';
+import { zActivateSkillBody, zActivateSkillPath, zCreateProviderBody, zDeleteApiV1FilesByFileIdPath, zDeleteApiV1HostsByIdPath, zDeleteApiV1HostsByIdProxyBy__Path, zDeleteApiV1HostsByIdProxyPath, zDeleteApiV1McpServersByNamePath, zDeleteApiV1McpServersByNameQuery, zDeleteApiV1OauthLoginQuery, zDeleteApiV1RemoteControlDevicesByIdPath, zDeleteApiV1WorkspacesByWorkspaceIdPath, zDeleteProviderPath, zDownloadFilePath, zDownloadFileQuery, zFsActionBody, zFsActionPath, zFsBrowseQuery, zFsContentQuery, zFsMkdirBody, zFsSuggestBody, zGetApiV1FilesByFileIdPath, zGetApiV1HostsByIdProxyBy__Path, zGetApiV1HostsByIdProxyPath, zGetApiV1McpAuthStatusesQuery, zGetApiV1McpServersByNamePath, zGetApiV1McpServersByNameQuery, zGetApiV1McpServersQuery, zGetApiV1OauthLoginQuery, zGetApiV1OauthUsageQuery, zGetApiV1OauthUserinfoQuery, zGetApiV1ProvidersByProviderIdPath, zGetApiV1SessionsBySessionIdAgentsByAgentIdTurnsPath, zGetApiV1SessionsBySessionIdAgentsByAgentIdTurnsQuery, zGetApiV1SessionsBySessionIdContextItemsByItemIdPath, zGetApiV1SessionsBySessionIdContextItemsByItemIdQuery, zGetApiV1SessionsBySessionIdContextItemsPath, zGetApiV1SessionsBySessionIdContextItemsQuery, zGetApiV1SessionsBySessionIdContextSummaryPath, zGetApiV1SessionsBySessionIdContextSummaryQuery, zGetApiV1SessionsBySessionIdEnvironmentPath, zGetApiV1SessionsBySessionIdEnvironmentsPath, zGetApiV1SessionsBySessionIdFileHistoryChangesPath, zGetApiV1SessionsBySessionIdFileHistoryChangesQuery, zGetApiV1SessionsBySessionIdFileHistoryContentPath, zGetApiV1SessionsBySessionIdFileHistoryContentQuery, zGetApiV1SessionsBySessionIdMediaByFileIdPath, zGetApiV1SessionsBySessionIdPath, zGetApiV1SessionsBySessionIdQuery, zGetApiV1SessionsBySessionIdWarningsPath, zGetApiV1SessionsQuery, zGetApiV1ToolsQuery, zGetApiV1WorkspacesByWorkspaceIdTrustPath, zGetApiV1WorkspacesProjectConfigDirsQuery, zGetApiV1WorkspacesQuery, zGetBy__Path, zGetCapabilityPath, zGetCatalogProviderPath, zGetPluginInfoPath, zGetPluginInfoQuery, zHeadApiV1HostsByIdProxyBy__Path, zHeadApiV1HostsByIdProxyPath, zInstallCapabilityBody, zInstallCapabilityPath, zInstallPluginBody, zListPromptsPath, zListSessionInteractionsPath, zListSkillsPath, zListWorkspaceSkillsPath, zPatchApiV1FeedbackByFeedbackIdBody, zPatchApiV1FeedbackByFeedbackIdPath, zPatchApiV1HostsByIdProxyBy__Path, zPatchApiV1HostsByIdProxyPath, zPatchApiV1RemoteControlDevicesByIdBody, zPatchApiV1RemoteControlDevicesByIdPath, zPatchApiV1WorkspacesByWorkspaceIdBody, zPatchApiV1WorkspacesByWorkspaceIdPath, zPluginActionPath, zPostApiV1ConfigBody, zPostApiV1FeedbackBody, zPostApiV1FeedbackByFeedbackIdAttachmentsBody, zPostApiV1FeedbackByFeedbackIdAttachmentsPath, zPostApiV1FeedbackByFeedbackIdAttachmentsQuery, zPostApiV1FeedbackByFeedbackIdAttachmentsSessionBody, zPostApiV1FeedbackByFeedbackIdAttachmentsSessionPath, zPostApiV1FeedbackSessionArchivesBody, zPostApiV1FilesBody, zPostApiV1HostsByIdProxyBy__Path, zPostApiV1HostsByIdProxyPath, zPostApiV1HostsConnectBody, zPostApiV1HostsCopyProvidersBody, zPostApiV1HostsTestBody, zPostApiV1McpAuthBeginBody, zPostApiV1McpAuthBeginQuery, zPostApiV1McpAuthCancelBody, zPostApiV1McpAuthCompleteBody, zPostApiV1McpAuthResetBody, zPostApiV1McpAuthResetQuery, zPostApiV1McpServersBody, zPostApiV1McpServersInspectBody, zPostApiV1McpServersQuery, zPostApiV1McpServersTestBody, zPostApiV1OauthLoginBody, zPostApiV1OauthLogoutBody, zPostApiV1RemoteControlBody, zPostApiV1RemoteControlDevicesByIdDeactivatePath, zPostApiV1SearchBody, zPostApiV1SessionsArchiveBody, zPostApiV1SessionsBody, zPostApiV1SessionsBySessionIdExportBody, zPostApiV1SessionsBySessionIdExportPath, zPostApiV1SessionsBySessionIdInteractionsByInteractionIdBody, zPostApiV1SessionsBySessionIdInteractionsByInteractionIdPath, zPostApiV1SessionsBySessionIdProfileBody, zPostApiV1SessionsBySessionIdProfilePath, zPostApiV1SessionsBySessionIdRatingBody, zPostApiV1SessionsBySessionIdRatingPath, zPostApiV1SessionsBySessionIdTitleGenerateBody, zPostApiV1SessionsBySessionIdTitleGeneratePath, zPostApiV1SessionsRestoreBody, zPostApiV1ShutdownQuery, zPostApiV1WorkspacesBody, zPostApiV1WorkspacesByWorkspaceIdPrimaryBody, zPostApiV1WorkspacesByWorkspaceIdPrimaryPath, zPostApiV1WorkspacesByWorkspaceIdTrustPath, zPostApiV1WorkspacesByWorkspaceIdUntrustPath, zPreviewPluginBody, zPromptActionPath, zProviderCollectionActionBody, zProviderCollectionActionPath, zPutApiV1HostsByIdBody, zPutApiV1HostsByIdPath, zPutApiV1HostsByIdProxyBy__Path, zPutApiV1HostsByIdProxyPath, zPutApiV1McpServersByNameBody, zPutApiV1McpServersByNamePath, zPutApiV1McpServersByNameQuery, zRefreshProviderPath, zReplaceProviderBody, zReplaceProviderPath, zRunAgentCloseActionPath, zRunSessionArchiveActionPath, zRunSessionCancelActionBody, zRunSessionCancelActionPath, zRunSessionContinueActionPath, zRunSessionDeleteActionPath, zRunSessionReloadActionPath, zRunSessionTakeoverActionPath, zRunSessionWaitActionBody, zRunSessionWaitActionPath, zSetDefaultModelPath, zSteerPromptContentBody, zSteerPromptContentPath, zSteerPromptsBody, zSteerPromptsPath, zSubmitPromptBody, zSubmitPromptPath, zWorkspaceFsListBody, zWorkspaceFsSearchBody, zWorkspaceFsSuggestBody, zWriteFsContentBody, zWriteFsContentQuery } from './zod.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -85,12 +85,16 @@ export const getCapability = <ThrowOnError extends boolean = false>(options: Opt
  */
 export const installCapability = <ThrowOnError extends boolean = false>(options: Options<InstallCapabilityData, ThrowOnError>): RequestResult<InstallCapabilityResponses, unknown, ThrowOnError> => (options.client ?? client).post<InstallCapabilityResponses, unknown, ThrowOnError>({
     requestValidator: async (data) => await z.object({
-        body: z.never().optional(),
+        body: zInstallCapabilityBody,
         path: zInstallCapabilityPath,
         query: z.never().optional()
     }).parseAsync(data),
     url: '/api/v1/capabilities/{tail}',
-    ...options
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
 });
 
 /**
@@ -150,16 +154,89 @@ export const postApiV1Config = <ThrowOnError extends boolean = false>(options: O
 });
 
 /**
- * List active WebSocket clients connected to the server
+ * Create global feedback or rate a completed assistant reply
  */
-export const getApiV1Connections = <ThrowOnError extends boolean = false>(options?: Options<GetApiV1ConnectionsData, ThrowOnError>): RequestResult<GetApiV1ConnectionsResponses, unknown, ThrowOnError> => (options?.client ?? client).get<GetApiV1ConnectionsResponses, unknown, ThrowOnError>({
+export const postApiV1Feedback = <ThrowOnError extends boolean = false>(options: Options<PostApiV1FeedbackData, ThrowOnError>): RequestResult<PostApiV1FeedbackResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiV1FeedbackResponses, unknown, ThrowOnError>({
     requestValidator: async (data) => await z.object({
-        body: z.never().optional(),
+        body: zPostApiV1FeedbackBody,
         path: z.never().optional(),
         query: z.never().optional()
     }).parseAsync(data),
-    url: '/api/v1/connections',
-    ...options
+    url: '/api/v1/feedback',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Add details to a reply rating or cancel it
+ */
+export const patchApiV1FeedbackByFeedbackId = <ThrowOnError extends boolean = false>(options: Options<PatchApiV1FeedbackByFeedbackIdData, ThrowOnError>): RequestResult<PatchApiV1FeedbackByFeedbackIdResponses, unknown, ThrowOnError> => (options.client ?? client).patch<PatchApiV1FeedbackByFeedbackIdResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: zPatchApiV1FeedbackByFeedbackIdBody,
+        path: zPatchApiV1FeedbackByFeedbackIdPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    url: '/api/v1/feedback/{feedback_id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Upload one user-selected media file or an authorized desktop diagnostics archive
+ */
+export const postApiV1FeedbackByFeedbackIdAttachments = <ThrowOnError extends boolean = false>(options: Options<PostApiV1FeedbackByFeedbackIdAttachmentsData, ThrowOnError>): RequestResult<PostApiV1FeedbackByFeedbackIdAttachmentsResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiV1FeedbackByFeedbackIdAttachmentsResponses, unknown, ThrowOnError>({
+    ...formDataBodySerializer,
+    requestValidator: async (data) => await z.object({
+        body: zPostApiV1FeedbackByFeedbackIdAttachmentsBody,
+        path: zPostApiV1FeedbackByFeedbackIdAttachmentsPath,
+        query: zPostApiV1FeedbackByFeedbackIdAttachmentsQuery
+    }).parseAsync(data),
+    url: '/api/v1/feedback/{feedback_id}/attachments',
+    ...options,
+    headers: {
+        'Content-Type': null,
+        ...options.headers
+    }
+});
+
+/**
+ * Export and upload an authorized session without global diagnostics
+ */
+export const postApiV1FeedbackByFeedbackIdAttachmentsSession = <ThrowOnError extends boolean = false>(options: Options<PostApiV1FeedbackByFeedbackIdAttachmentsSessionData, ThrowOnError>): RequestResult<PostApiV1FeedbackByFeedbackIdAttachmentsSessionResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiV1FeedbackByFeedbackIdAttachmentsSessionResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: zPostApiV1FeedbackByFeedbackIdAttachmentsSessionBody,
+        path: zPostApiV1FeedbackByFeedbackIdAttachmentsSessionPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    url: '/api/v1/feedback/{feedback_id}/attachments/session',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Prepare an expiring session-only archive for a feedback attachment on another host
+ */
+export const postApiV1FeedbackSessionArchives = <ThrowOnError extends boolean = false>(options: Options<PostApiV1FeedbackSessionArchivesData, ThrowOnError>): RequestResult<PostApiV1FeedbackSessionArchivesResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiV1FeedbackSessionArchivesResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: zPostApiV1FeedbackSessionArchivesBody,
+        path: z.never().optional(),
+        query: z.never().optional()
+    }).parseAsync(data),
+    url: '/api/v1/feedback/session-archives',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
 });
 
 /**
@@ -220,9 +297,9 @@ export const fsBrowse = <ThrowOnError extends boolean = false>(options?: Options
 });
 
 /**
- * Serve the raw content of any file on the host filesystem by absolute path. Supports ETag caching and single-range requests.
+ * Serve the raw content of any file on the host filesystem by absolute path. Supports ETag caching and single-range requests. `environment_id` selects the filesystem of a shared app-level environment; defaults to local.
  */
-export const fsContent = <ThrowOnError extends boolean = false>(options: Options<FsContentData, ThrowOnError>): RequestResult<FsContentResponses, unknown, ThrowOnError> => (options.client ?? client).get<FsContentResponses, unknown, ThrowOnError>({
+export const fsContent = <ThrowOnError extends boolean = false>(options: Options<FsContentData, ThrowOnError>): RequestResult<FsContentResponses, FsContentErrors, ThrowOnError> => (options.client ?? client).get<FsContentResponses, FsContentErrors, ThrowOnError>({
     requestValidator: async (data) => await z.object({
         body: z.never().optional(),
         path: z.never().optional(),
@@ -230,6 +307,24 @@ export const fsContent = <ThrowOnError extends boolean = false>(options: Options
     }).parseAsync(data),
     url: '/api/v1/fs:content',
     ...options
+});
+
+/**
+ * Create or replace an allowlisted UTF-8 host file. Supply the SHA-256 of the bytes read, or missing to create only.
+ */
+export const writeFsContent = <ThrowOnError extends boolean = false>(options: Options<WriteFsContentData, ThrowOnError>): RequestResult<WriteFsContentResponses, WriteFsContentErrors, ThrowOnError> => (options.client ?? client).put<WriteFsContentResponses, WriteFsContentErrors, ThrowOnError>({
+    bodySerializer: null,
+    requestValidator: async (data) => await z.object({
+        body: zWriteFsContentBody,
+        path: z.never().optional(),
+        query: zWriteFsContentQuery
+    }).parseAsync(data),
+    url: '/api/v1/fs:content',
+    ...options,
+    headers: {
+        'Content-Type': 'text/plain',
+        ...options.headers
+    }
 });
 
 /**
@@ -246,7 +341,7 @@ export const fsHome = <ThrowOnError extends boolean = false>(options?: Options<F
 });
 
 /**
- * Create a directory on the host filesystem by absolute path (folder-picker "new folder" backend). Non-recursive: the parent directory must already exist.
+ * Create a directory on the host filesystem by absolute path (folder-picker "new folder" backend). Non-recursive: the parent directory must already exist. `environment_id` selects the filesystem of a shared app-level environment; defaults to local.
  */
 export const fsMkdir = <ThrowOnError extends boolean = false>(options: Options<FsMkdirData, ThrowOnError>): RequestResult<FsMkdirResponses, unknown, ThrowOnError> => (options.client ?? client).post<FsMkdirResponses, unknown, ThrowOnError>({
     requestValidator: async (data) => await z.object({
@@ -280,79 +375,6 @@ export const fsSuggest = <ThrowOnError extends boolean = false>(options: Options
 });
 
 /**
- * Delete all values (mirrors localStorage.clear).
- */
-export const postApiV1GuiStoreClear = <ThrowOnError extends boolean = false>(options?: Options<PostApiV1GuiStoreClearData, ThrowOnError>): RequestResult<PostApiV1GuiStoreClearResponses, unknown, ThrowOnError> => (options?.client ?? client).post<PostApiV1GuiStoreClearResponses, unknown, ThrowOnError>({
-    requestValidator: async (data) => await z.object({
-        body: z.never().optional(),
-        path: z.never().optional(),
-        query: z.never().optional()
-    }).parseAsync(data),
-    url: '/api/v1/gui/store/clear',
-    ...options
-});
-
-/**
- * Read a value by key (mirrors localStorage.getItem).
- */
-export const getApiV1GuiStoreGetItem = <ThrowOnError extends boolean = false>(options: Options<GetApiV1GuiStoreGetItemData, ThrowOnError>): RequestResult<GetApiV1GuiStoreGetItemResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiV1GuiStoreGetItemResponses, unknown, ThrowOnError>({
-    requestValidator: async (data) => await z.object({
-        body: z.never().optional(),
-        path: z.never().optional(),
-        query: zGetApiV1GuiStoreGetItemQuery
-    }).parseAsync(data),
-    url: '/api/v1/gui/store/getItem',
-    ...options
-});
-
-/**
- * Number of stored keys (mirrors localStorage.length).
- */
-export const getApiV1GuiStoreLength = <ThrowOnError extends boolean = false>(options?: Options<GetApiV1GuiStoreLengthData, ThrowOnError>): RequestResult<GetApiV1GuiStoreLengthResponses, unknown, ThrowOnError> => (options?.client ?? client).get<GetApiV1GuiStoreLengthResponses, unknown, ThrowOnError>({
-    requestValidator: async (data) => await z.object({
-        body: z.never().optional(),
-        path: z.never().optional(),
-        query: z.never().optional()
-    }).parseAsync(data),
-    url: '/api/v1/gui/store/length',
-    ...options
-});
-
-/**
- * Delete a value by key (mirrors localStorage.removeItem).
- */
-export const postApiV1GuiStoreRemoveItem = <ThrowOnError extends boolean = false>(options: Options<PostApiV1GuiStoreRemoveItemData, ThrowOnError>): RequestResult<PostApiV1GuiStoreRemoveItemResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiV1GuiStoreRemoveItemResponses, unknown, ThrowOnError>({
-    requestValidator: async (data) => await z.object({
-        body: zPostApiV1GuiStoreRemoveItemBody,
-        path: z.never().optional(),
-        query: z.never().optional()
-    }).parseAsync(data),
-    url: '/api/v1/gui/store/removeItem',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
-
-/**
- * Write a value by key (mirrors localStorage.setItem).
- */
-export const postApiV1GuiStoreSetItem = <ThrowOnError extends boolean = false>(options: Options<PostApiV1GuiStoreSetItemData, ThrowOnError>): RequestResult<PostApiV1GuiStoreSetItemResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiV1GuiStoreSetItemResponses, unknown, ThrowOnError>({
-    requestValidator: async (data) => await z.object({
-        body: zPostApiV1GuiStoreSetItemBody,
-        path: z.never().optional(),
-        query: z.never().optional()
-    }).parseAsync(data),
-    url: '/api/v1/gui/store/setItem',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
-
-/**
  * Health check
  */
 export const getApiV1Healthz = <ThrowOnError extends boolean = false>(options?: Options<GetApiV1HealthzData, ThrowOnError>): RequestResult<GetApiV1HealthzResponses, unknown, ThrowOnError> => (options?.client ?? client).get<GetApiV1HealthzResponses, unknown, ThrowOnError>({
@@ -366,29 +388,431 @@ export const getApiV1Healthz = <ThrowOnError extends boolean = false>(options?: 
 });
 
 /**
- * List configured MCP servers
+ * List configured SSH hosts and their connection status
+ */
+export const getApiV1Hosts = <ThrowOnError extends boolean = false>(options?: Options<GetApiV1HostsData, ThrowOnError>): RequestResult<GetApiV1HostsResponses, unknown, ThrowOnError> => (options?.client ?? client).get<GetApiV1HostsResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: z.never().optional(),
+        query: z.never().optional()
+    }).parseAsync(data),
+    url: '/api/v1/hosts',
+    ...options
+});
+
+/**
+ * Connect a configured host now; failures are reported in the returned status
+ */
+export const postApiV1HostsConnect = <ThrowOnError extends boolean = false>(options: Options<PostApiV1HostsConnectData, ThrowOnError>): RequestResult<PostApiV1HostsConnectResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiV1HostsConnectResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: zPostApiV1HostsConnectBody,
+        path: z.never().optional(),
+        query: z.never().optional()
+    }).parseAsync(data),
+    url: '/api/v1/hosts:connect',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Copy shareable custom model providers on this computer to a host, replacing providers with the same name there
+ */
+export const postApiV1HostsCopyProviders = <ThrowOnError extends boolean = false>(options: Options<PostApiV1HostsCopyProvidersData, ThrowOnError>): RequestResult<PostApiV1HostsCopyProvidersResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiV1HostsCopyProvidersResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: zPostApiV1HostsCopyProvidersBody,
+        path: z.never().optional(),
+        query: z.never().optional()
+    }).parseAsync(data),
+    url: '/api/v1/hosts:copy-providers',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * List concrete Host aliases declared in the local ~/.ssh/config
+ */
+export const getApiV1HostsSshHosts = <ThrowOnError extends boolean = false>(options?: Options<GetApiV1HostsSshHostsData, ThrowOnError>): RequestResult<GetApiV1HostsSshHostsResponses, unknown, ThrowOnError> => (options?.client ?? client).get<GetApiV1HostsSshHostsResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: z.never().optional(),
+        query: z.never().optional()
+    }).parseAsync(data),
+    url: '/api/v1/hosts:ssh-hosts',
+    ...options
+});
+
+/**
+ * Check SSH connectivity and the remote kimi version without starting a server
+ */
+export const postApiV1HostsTest = <ThrowOnError extends boolean = false>(options: Options<PostApiV1HostsTestData, ThrowOnError>): RequestResult<PostApiV1HostsTestResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiV1HostsTestResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: zPostApiV1HostsTestBody,
+        path: z.never().optional(),
+        query: z.never().optional()
+    }).parseAsync(data),
+    url: '/api/v1/hosts:test',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Remove a host
+ */
+export const deleteApiV1HostsById = <ThrowOnError extends boolean = false>(options: Options<DeleteApiV1HostsByIdData, ThrowOnError>): RequestResult<DeleteApiV1HostsByIdResponses, unknown, ThrowOnError> => (options.client ?? client).delete<DeleteApiV1HostsByIdResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zDeleteApiV1HostsByIdPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    url: '/api/v1/hosts/{id}',
+    ...options
+});
+
+/**
+ * Create or replace a host
+ */
+export const putApiV1HostsById = <ThrowOnError extends boolean = false>(options: Options<PutApiV1HostsByIdData, ThrowOnError>): RequestResult<PutApiV1HostsByIdResponses, unknown, ThrowOnError> => (options.client ?? client).put<PutApiV1HostsByIdResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: zPutApiV1HostsByIdBody,
+        path: zPutApiV1HostsByIdPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    url: '/api/v1/hosts/{id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const deleteApiV1HostsByIdProxy = <ThrowOnError extends boolean = false>(options: Options<DeleteApiV1HostsByIdProxyData, ThrowOnError>): RequestResult<DeleteApiV1HostsByIdProxyResponses, unknown, ThrowOnError> => (options.client ?? client).delete<DeleteApiV1HostsByIdProxyResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zDeleteApiV1HostsByIdProxyPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    url: '/api/v1/hosts/{id}/proxy',
+    ...options
+});
+
+export const getApiV1HostsByIdProxy = <ThrowOnError extends boolean = false>(options: Options<GetApiV1HostsByIdProxyData, ThrowOnError>): RequestResult<GetApiV1HostsByIdProxyResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiV1HostsByIdProxyResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zGetApiV1HostsByIdProxyPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    url: '/api/v1/hosts/{id}/proxy',
+    ...options
+});
+
+export const headApiV1HostsByIdProxy = <ThrowOnError extends boolean = false>(options: Options<HeadApiV1HostsByIdProxyData, ThrowOnError>): RequestResult<HeadApiV1HostsByIdProxyResponses, unknown, ThrowOnError> => (options.client ?? client).head<HeadApiV1HostsByIdProxyResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zHeadApiV1HostsByIdProxyPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    url: '/api/v1/hosts/{id}/proxy',
+    ...options
+});
+
+export const patchApiV1HostsByIdProxy = <ThrowOnError extends boolean = false>(options: Options<PatchApiV1HostsByIdProxyData, ThrowOnError>): RequestResult<PatchApiV1HostsByIdProxyResponses, unknown, ThrowOnError> => (options.client ?? client).patch<PatchApiV1HostsByIdProxyResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zPatchApiV1HostsByIdProxyPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    url: '/api/v1/hosts/{id}/proxy',
+    ...options
+});
+
+export const postApiV1HostsByIdProxy = <ThrowOnError extends boolean = false>(options: Options<PostApiV1HostsByIdProxyData, ThrowOnError>): RequestResult<PostApiV1HostsByIdProxyResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiV1HostsByIdProxyResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zPostApiV1HostsByIdProxyPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    url: '/api/v1/hosts/{id}/proxy',
+    ...options
+});
+
+export const putApiV1HostsByIdProxy = <ThrowOnError extends boolean = false>(options: Options<PutApiV1HostsByIdProxyData, ThrowOnError>): RequestResult<PutApiV1HostsByIdProxyResponses, unknown, ThrowOnError> => (options.client ?? client).put<PutApiV1HostsByIdProxyResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zPutApiV1HostsByIdProxyPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    url: '/api/v1/hosts/{id}/proxy',
+    ...options
+});
+
+export const deleteApiV1HostsByIdProxyBy__ = <ThrowOnError extends boolean = false>(options: Options<DeleteApiV1HostsByIdProxyBy__Data, ThrowOnError>): RequestResult<DeleteApiV1HostsByIdProxyBy__Responses, unknown, ThrowOnError> => (options.client ?? client).delete<DeleteApiV1HostsByIdProxyBy__Responses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zDeleteApiV1HostsByIdProxyBy__Path,
+        query: z.never().optional()
+    }).parseAsync(data),
+    url: '/api/v1/hosts/{id}/proxy/{*}',
+    ...options
+});
+
+export const getApiV1HostsByIdProxyBy__ = <ThrowOnError extends boolean = false>(options: Options<GetApiV1HostsByIdProxyBy__Data, ThrowOnError>): RequestResult<GetApiV1HostsByIdProxyBy__Responses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiV1HostsByIdProxyBy__Responses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zGetApiV1HostsByIdProxyBy__Path,
+        query: z.never().optional()
+    }).parseAsync(data),
+    url: '/api/v1/hosts/{id}/proxy/{*}',
+    ...options
+});
+
+export const headApiV1HostsByIdProxyBy__ = <ThrowOnError extends boolean = false>(options: Options<HeadApiV1HostsByIdProxyBy__Data, ThrowOnError>): RequestResult<HeadApiV1HostsByIdProxyBy__Responses, unknown, ThrowOnError> => (options.client ?? client).head<HeadApiV1HostsByIdProxyBy__Responses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zHeadApiV1HostsByIdProxyBy__Path,
+        query: z.never().optional()
+    }).parseAsync(data),
+    url: '/api/v1/hosts/{id}/proxy/{*}',
+    ...options
+});
+
+export const patchApiV1HostsByIdProxyBy__ = <ThrowOnError extends boolean = false>(options: Options<PatchApiV1HostsByIdProxyBy__Data, ThrowOnError>): RequestResult<PatchApiV1HostsByIdProxyBy__Responses, unknown, ThrowOnError> => (options.client ?? client).patch<PatchApiV1HostsByIdProxyBy__Responses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zPatchApiV1HostsByIdProxyBy__Path,
+        query: z.never().optional()
+    }).parseAsync(data),
+    url: '/api/v1/hosts/{id}/proxy/{*}',
+    ...options
+});
+
+export const postApiV1HostsByIdProxyBy__ = <ThrowOnError extends boolean = false>(options: Options<PostApiV1HostsByIdProxyBy__Data, ThrowOnError>): RequestResult<PostApiV1HostsByIdProxyBy__Responses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiV1HostsByIdProxyBy__Responses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zPostApiV1HostsByIdProxyBy__Path,
+        query: z.never().optional()
+    }).parseAsync(data),
+    url: '/api/v1/hosts/{id}/proxy/{*}',
+    ...options
+});
+
+export const putApiV1HostsByIdProxyBy__ = <ThrowOnError extends boolean = false>(options: Options<PutApiV1HostsByIdProxyBy__Data, ThrowOnError>): RequestResult<PutApiV1HostsByIdProxyBy__Responses, unknown, ThrowOnError> => (options.client ?? client).put<PutApiV1HostsByIdProxyBy__Responses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zPutApiV1HostsByIdProxyBy__Path,
+        query: z.never().optional()
+    }).parseAsync(data),
+    url: '/api/v1/hosts/{id}/proxy/{*}',
+    ...options
+});
+
+/**
+ * Get the built-in Kimi Agent Protocol (KAP) Markdown specification matching this server version
+ */
+export const getKapSpec = <ThrowOnError extends boolean = false>(options?: Options<GetKapSpecData, ThrowOnError>): RequestResult<GetKapSpecResponses, unknown, ThrowOnError> => (options?.client ?? client).get<GetKapSpecResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: z.never().optional(),
+        query: z.never().optional()
+    }).parseAsync(data),
+    url: '/api/v1/kap.md',
+    ...options
+});
+
+/**
+ * Per-server OAuth state over the registry catalog. Omitted `verify` preserves implicit OAuth detection; `verify=false` is fully offline; `verify=true` verifies every candidate. Probes may refresh or invalidate credentials.
+ */
+export const getApiV1McpAuthStatuses = <ThrowOnError extends boolean = false>(options?: Options<GetApiV1McpAuthStatusesData, ThrowOnError>): RequestResult<GetApiV1McpAuthStatusesResponses, unknown, ThrowOnError> => (options?.client ?? client).get<GetApiV1McpAuthStatusesResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: z.never().optional(),
+        query: zGetApiV1McpAuthStatusesQuery.optional()
+    }).parseAsync(data),
+    url: '/api/v1/mcp/auth-statuses',
+    ...options
+});
+
+/**
+ * Begin an interactive OAuth flow for a remote server. Answers `authorization-required` with the flow handle + URL, or `already-authorized` when a grant exists.
+ */
+export const postApiV1McpAuthBegin = <ThrowOnError extends boolean = false>(options: Options<PostApiV1McpAuthBeginData, ThrowOnError>): RequestResult<PostApiV1McpAuthBeginResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiV1McpAuthBeginResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: zPostApiV1McpAuthBeginBody,
+        path: z.never().optional(),
+        query: zPostApiV1McpAuthBeginQuery.optional()
+    }).parseAsync(data),
+    url: '/api/v1/mcp/auth:begin',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Tear down a begun OAuth flow without finishing it; unknown flows are ignored.
+ */
+export const postApiV1McpAuthCancel = <ThrowOnError extends boolean = false>(options: Options<PostApiV1McpAuthCancelData, ThrowOnError>): RequestResult<PostApiV1McpAuthCancelResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiV1McpAuthCancelResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: zPostApiV1McpAuthCancelBody,
+        path: z.never().optional(),
+        query: z.never().optional()
+    }).parseAsync(data),
+    url: '/api/v1/mcp/auth:cancel',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Await the browser callback of a begun flow and finish the code exchange (`40001` for an unknown `flow_id`).
+ */
+export const postApiV1McpAuthComplete = <ThrowOnError extends boolean = false>(options: Options<PostApiV1McpAuthCompleteData, ThrowOnError>): RequestResult<PostApiV1McpAuthCompleteResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiV1McpAuthCompleteResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: zPostApiV1McpAuthCompleteBody,
+        path: z.never().optional(),
+        query: z.never().optional()
+    }).parseAsync(data),
+    url: '/api/v1/mcp/auth:complete',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Clear the stored credentials of one server; the invalidation event reaches live sessions.
+ */
+export const postApiV1McpAuthReset = <ThrowOnError extends boolean = false>(options: Options<PostApiV1McpAuthResetData, ThrowOnError>): RequestResult<PostApiV1McpAuthResetResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiV1McpAuthResetResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: zPostApiV1McpAuthResetBody,
+        path: z.never().optional(),
+        query: zPostApiV1McpAuthResetQuery.optional()
+    }).parseAsync(data),
+    url: '/api/v1/mcp/auth:reset',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * List every MCP server the management plane knows about (user-level file, plugin manifests; project layers join when `cwd` is given). Read-only entries carry redacted configs.
  */
 export const getApiV1McpServers = <ThrowOnError extends boolean = false>(options?: Options<GetApiV1McpServersData, ThrowOnError>): RequestResult<GetApiV1McpServersResponses, unknown, ThrowOnError> => (options?.client ?? client).get<GetApiV1McpServersResponses, unknown, ThrowOnError>({
     requestValidator: async (data) => await z.object({
         body: z.never().optional(),
         path: z.never().optional(),
-        query: z.never().optional()
+        query: zGetApiV1McpServersQuery.optional()
     }).parseAsync(data),
     url: '/api/v1/mcp/servers',
     ...options
 });
 
 /**
- * Restart an MCP server by ID
+ * Add a server to the user-level `mcp.json`; a same-named read-only entry (plugin / project layer) is rejected. Returns the refreshed list.
  */
-export const restartMcpServer = <ThrowOnError extends boolean = false>(options: Options<RestartMcpServerData, ThrowOnError>): RequestResult<RestartMcpServerResponses, unknown, ThrowOnError> => (options.client ?? client).post<RestartMcpServerResponses, unknown, ThrowOnError>({
+export const postApiV1McpServers = <ThrowOnError extends boolean = false>(options: Options<PostApiV1McpServersData, ThrowOnError>): RequestResult<PostApiV1McpServersResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiV1McpServersResponses, unknown, ThrowOnError>({
     requestValidator: async (data) => await z.object({
-        body: z.never().optional(),
-        path: zRestartMcpServerPath,
+        body: zPostApiV1McpServersBody,
+        path: z.never().optional(),
+        query: zPostApiV1McpServersQuery.optional()
+    }).parseAsync(data),
+    url: '/api/v1/mcp/servers',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * The locator-addressed catalog (redacted configs) plus a batched real-connection probe of every OAuth candidate. `targets` narrows the catalog; omitted inspects all. `cwd` includes trusted project layers.
+ */
+export const postApiV1McpServersInspect = <ThrowOnError extends boolean = false>(options: Options<PostApiV1McpServersInspectData, ThrowOnError>): RequestResult<PostApiV1McpServersInspectResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiV1McpServersInspectResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: zPostApiV1McpServersInspectBody,
+        path: z.never().optional(),
         query: z.never().optional()
     }).parseAsync(data),
-    url: '/api/v1/mcp/servers/{tail}',
+    url: '/api/v1/mcp/servers:inspect',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Probe a real connection to one server: pass `name` to test a registry entry (plugin and project layers included) or an inline `server` config to probe it as-is. Never persists anything.
+ */
+export const postApiV1McpServersTest = <ThrowOnError extends boolean = false>(options: Options<PostApiV1McpServersTestData, ThrowOnError>): RequestResult<PostApiV1McpServersTestResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiV1McpServersTestResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: zPostApiV1McpServersTestBody,
+        path: z.never().optional(),
+        query: z.never().optional()
+    }).parseAsync(data),
+    url: '/api/v1/mcp/servers:test',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Remove a user-level entry; read-only entries reject the delete. Returns the refreshed list.
+ */
+export const deleteApiV1McpServersByName = <ThrowOnError extends boolean = false>(options: Options<DeleteApiV1McpServersByNameData, ThrowOnError>): RequestResult<DeleteApiV1McpServersByNameResponses, unknown, ThrowOnError> => (options.client ?? client).delete<DeleteApiV1McpServersByNameResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zDeleteApiV1McpServersByNamePath,
+        query: zDeleteApiV1McpServersByNameQuery.optional()
+    }).parseAsync(data),
+    url: '/api/v1/mcp/servers/{name}',
     ...options
+});
+
+/**
+ * Get one MCP server by runtime name (`40408` when unknown).
+ */
+export const getApiV1McpServersByName = <ThrowOnError extends boolean = false>(options: Options<GetApiV1McpServersByNameData, ThrowOnError>): RequestResult<GetApiV1McpServersByNameResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiV1McpServersByNameResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zGetApiV1McpServersByNamePath,
+        query: zGetApiV1McpServersByNameQuery.optional()
+    }).parseAsync(data),
+    url: '/api/v1/mcp/servers/{name}',
+    ...options
+});
+
+/**
+ * Replace the user-level entry named in the path (the body carries no `name`); read-only entries reject the write. Returns the refreshed list.
+ */
+export const putApiV1McpServersByName = <ThrowOnError extends boolean = false>(options: Options<PutApiV1McpServersByNameData, ThrowOnError>): RequestResult<PutApiV1McpServersByNameResponses, unknown, ThrowOnError> => (options.client ?? client).put<PutApiV1McpServersByNameResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: zPutApiV1McpServersByNameBody,
+        path: zPutApiV1McpServersByNamePath,
+        query: zPutApiV1McpServersByNameQuery.optional()
+    }).parseAsync(data),
+    url: '/api/v1/mcp/servers/{name}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
 });
 
 /**
@@ -543,7 +967,7 @@ export const listPlugins = <ThrowOnError extends boolean = false>(options?: Opti
 });
 
 /**
- * Install a plugin from a local path, zip URL, or GitHub repo
+ * Install a custom plugin or a marketplace entry at an expected version
  */
 export const installPlugin = <ThrowOnError extends boolean = false>(options: Options<InstallPluginData, ThrowOnError>): RequestResult<InstallPluginResponses, unknown, ThrowOnError> => (options.client ?? client).post<InstallPluginResponses, unknown, ThrowOnError>({
     requestValidator: async (data) => await z.object({
@@ -557,6 +981,19 @@ export const installPlugin = <ThrowOnError extends boolean = false>(options: Opt
         'Content-Type': 'application/json',
         ...options.headers
     }
+});
+
+/**
+ * Get an installed plugin and its declared capabilities
+ */
+export const getPluginInfo = <ThrowOnError extends boolean = false>(options: Options<GetPluginInfoData, ThrowOnError>): RequestResult<GetPluginInfoResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetPluginInfoResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zGetPluginInfoPath,
+        query: zGetPluginInfoQuery.optional()
+    }).parseAsync(data),
+    url: '/api/v1/plugins/{tail}',
+    ...options
 });
 
 /**
@@ -586,6 +1023,23 @@ export const listPluginMarketplace = <ThrowOnError extends boolean = false>(opti
 });
 
 /**
+ * Inspect marketplace capabilities without installing the plugin
+ */
+export const previewPlugin = <ThrowOnError extends boolean = false>(options: Options<PreviewPluginData, ThrowOnError>): RequestResult<PreviewPluginResponses, unknown, ThrowOnError> => (options.client ?? client).post<PreviewPluginResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: zPreviewPluginBody,
+        path: z.never().optional(),
+        query: z.never().optional()
+    }).parseAsync(data),
+    url: '/api/v1/plugins/preview',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
  * List configured providers
  */
 export const getApiV1Providers = <ThrowOnError extends boolean = false>(options?: Options<GetApiV1ProvidersData, ThrowOnError>): RequestResult<GetApiV1ProvidersResponses, unknown, ThrowOnError> => (options?.client ?? client).get<GetApiV1ProvidersResponses, unknown, ThrowOnError>({
@@ -599,7 +1053,7 @@ export const getApiV1Providers = <ThrowOnError extends boolean = false>(options?
 });
 
 /**
- * Create a provider manually (type + credentials + model list). When no global default_model is configured (fresh setup), it is seeded with the new provider default (or first) model; an existing default is never modified.
+ * Create a provider manually (type + credentials + model list). Credentials are either `api_key` (stored inline) or `api_key_env` (name of an environment variable to read the key from); they are mutually exclusive — submitting both fails validation. When no global default_model is configured (fresh setup), it is seeded with the new provider default (or first) model; an existing default is never modified.
  */
 export const createProvider = <ThrowOnError extends boolean = false>(options: Options<CreateProviderData, ThrowOnError>): RequestResult<CreateProviderResponses, unknown, ThrowOnError> => (options.client ?? client).post<CreateProviderResponses, unknown, ThrowOnError>({
     requestValidator: async (data) => await z.object({
@@ -659,7 +1113,7 @@ export const getApiV1ProvidersByProviderId = <ThrowOnError extends boolean = fal
 });
 
 /**
- * Replace a provider in one save (type + base_url + model list), optionally renaming it via `new_id` (the providers key, model aliases, default_provider and a default_model pointing at an old alias all migrate). `api_key` is tri-state: omitted keeps the stored key, "" clears it, any other value replaces it. The provider's model aliases are rebuilt from `models` — aliases no longer listed disappear from config.toml, other providers' aliases are untouched. Beyond the rename migration, the global default pointers are never modified. Answers 200 with `{provider}`. OAuth-managed providers are rejected: log out via /oauth/logout instead.
+ * Replace a provider in one save (type + base_url + model list), optionally renaming it via `new_id` (the providers key, model aliases, default_provider and a default_model pointing at an old alias all migrate). `api_key` is tri-state: omitted keeps the stored key, "" clears it, any other value replaces it. `api_key_env` (name of an environment variable to read the key from instead of storing it) is likewise tri-state and mutually exclusive with `api_key` — setting one clears the other, submitting both fails validation. The provider's model aliases are rebuilt from `models` — aliases no longer listed disappear from config.toml, other providers' aliases are untouched. Beyond the rename migration, the global default pointers are never modified. Answers 200 with `{provider}`. OAuth-managed providers are rejected: log out via /oauth/logout instead.
  */
 export const replaceProvider = <ThrowOnError extends boolean = false>(options: Options<ReplaceProviderData, ThrowOnError>): RequestResult<ReplaceProviderResponses, unknown, ThrowOnError> => (options.client ?? client).put<ReplaceProviderResponses, unknown, ThrowOnError>({
     requestValidator: async (data) => await z.object({
@@ -689,6 +1143,92 @@ export const refreshProvider = <ThrowOnError extends boolean = false>(options: O
 });
 
 /**
+ * Get the Remote Control tunnel status
+ */
+export const getApiV1RemoteControl = <ThrowOnError extends boolean = false>(options?: Options<GetApiV1RemoteControlData, ThrowOnError>): RequestResult<GetApiV1RemoteControlResponses, unknown, ThrowOnError> => (options?.client ?? client).get<GetApiV1RemoteControlResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: z.never().optional(),
+        query: z.never().optional()
+    }).parseAsync(data),
+    url: '/api/v1/remote-control',
+    ...options
+});
+
+/**
+ * Start or stop the Remote Control tunnel
+ */
+export const postApiV1RemoteControl = <ThrowOnError extends boolean = false>(options: Options<PostApiV1RemoteControlData, ThrowOnError>): RequestResult<PostApiV1RemoteControlResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiV1RemoteControlResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: zPostApiV1RemoteControlBody,
+        path: z.never().optional(),
+        query: z.never().optional()
+    }).parseAsync(data),
+    url: '/api/v1/remote-control',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * List Remote Control devices
+ */
+export const getApiV1RemoteControlDevices = <ThrowOnError extends boolean = false>(options?: Options<GetApiV1RemoteControlDevicesData, ThrowOnError>): RequestResult<GetApiV1RemoteControlDevicesResponses, unknown, ThrowOnError> => (options?.client ?? client).get<GetApiV1RemoteControlDevicesResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: z.never().optional(),
+        query: z.never().optional()
+    }).parseAsync(data),
+    url: '/api/v1/remote-control/devices',
+    ...options
+});
+
+/**
+ * Delete a Remote Control device
+ */
+export const deleteApiV1RemoteControlDevicesById = <ThrowOnError extends boolean = false>(options: Options<DeleteApiV1RemoteControlDevicesByIdData, ThrowOnError>): RequestResult<DeleteApiV1RemoteControlDevicesByIdResponses, unknown, ThrowOnError> => (options.client ?? client).delete<DeleteApiV1RemoteControlDevicesByIdResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zDeleteApiV1RemoteControlDevicesByIdPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    url: '/api/v1/remote-control/devices/{id}',
+    ...options
+});
+
+/**
+ * Rename a Remote Control device
+ */
+export const patchApiV1RemoteControlDevicesById = <ThrowOnError extends boolean = false>(options: Options<PatchApiV1RemoteControlDevicesByIdData, ThrowOnError>): RequestResult<PatchApiV1RemoteControlDevicesByIdResponses, unknown, ThrowOnError> => (options.client ?? client).patch<PatchApiV1RemoteControlDevicesByIdResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: zPatchApiV1RemoteControlDevicesByIdBody,
+        path: zPatchApiV1RemoteControlDevicesByIdPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    url: '/api/v1/remote-control/devices/{id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Deactivate a Remote Control device
+ */
+export const postApiV1RemoteControlDevicesByIdDeactivate = <ThrowOnError extends boolean = false>(options: Options<PostApiV1RemoteControlDevicesByIdDeactivateData, ThrowOnError>): RequestResult<PostApiV1RemoteControlDevicesByIdDeactivateResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiV1RemoteControlDevicesByIdDeactivateResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zPostApiV1RemoteControlDevicesByIdDeactivatePath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    url: '/api/v1/remote-control/devices/{id}/deactivate',
+    ...options
+});
+
+/**
  * Global full-text search over user messages, assistant replies and session titles across all sessions
  */
 export const postApiV1Search = <ThrowOnError extends boolean = false>(options: Options<PostApiV1SearchData, ThrowOnError>): RequestResult<PostApiV1SearchResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiV1SearchResponses, unknown, ThrowOnError>({
@@ -706,7 +1246,7 @@ export const postApiV1Search = <ThrowOnError extends boolean = false>(options: O
 });
 
 /**
- * List sessions
+ * List sessions with filtering (query matches title or last prompt as a case-insensitive substring, or an exact session id), sorting, optional workspace grouping (view=by_workspace), optional git branch/PR metadata (include=git), or lightweight id projection (fields=id,archived; page_size ceiling relaxed to 10000). Paginate with page_token, 1-based page, or flat before_id/after_id cursors. hosts=include merges sessions from the app-created projects on every SSH host.
  */
 export const getApiV1Sessions = <ThrowOnError extends boolean = false>(options: Options<GetApiV1SessionsData, ThrowOnError>): RequestResult<GetApiV1SessionsResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiV1SessionsResponses, unknown, ThrowOnError>({
     requestValidator: async (data) => await z.object({
@@ -736,13 +1276,47 @@ export const postApiV1Sessions = <ThrowOnError extends boolean = false>(options:
 });
 
 /**
- * Get a session by ID
+ * Batch-archive sessions by id ({ ids }, <= 5000 unique). Per-item results — a missing session folds into its own item; cold sessions are patched without materialization.
+ */
+export const postApiV1SessionsArchive = <ThrowOnError extends boolean = false>(options: Options<PostApiV1SessionsArchiveData, ThrowOnError>): RequestResult<PostApiV1SessionsArchiveResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiV1SessionsArchiveResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: zPostApiV1SessionsArchiveBody,
+        path: z.never().optional(),
+        query: z.never().optional()
+    }).parseAsync(data),
+    url: '/api/v1/sessions:archive',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Batch-restore sessions by id ({ ids }, <= 5000 unique). Per-item results — a missing session folds into its own item; cold sessions are patched without materialization.
+ */
+export const postApiV1SessionsRestore = <ThrowOnError extends boolean = false>(options: Options<PostApiV1SessionsRestoreData, ThrowOnError>): RequestResult<PostApiV1SessionsRestoreResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiV1SessionsRestoreResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: zPostApiV1SessionsRestoreBody,
+        path: z.never().optional(),
+        query: z.never().optional()
+    }).parseAsync(data),
+    url: '/api/v1/sessions:restore',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Get a session by ID. hosts=include also looks the session up on each SSH host and tags it with host_id; when it is not found and a host cannot answer, the result is HOST_UNAVAILABLE
  */
 export const getApiV1SessionsBySessionId = <ThrowOnError extends boolean = false>(options: Options<GetApiV1SessionsBySessionIdData, ThrowOnError>): RequestResult<GetApiV1SessionsBySessionIdResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiV1SessionsBySessionIdResponses, unknown, ThrowOnError>({
     requestValidator: async (data) => await z.object({
         body: z.never().optional(),
         path: zGetApiV1SessionsBySessionIdPath,
-        query: z.never().optional()
+        query: zGetApiV1SessionsBySessionIdQuery.optional()
     }).parseAsync(data),
     url: '/api/v1/sessions/{session_id}',
     ...options
@@ -753,11 +1327,24 @@ export const getApiV1SessionsBySessionId = <ThrowOnError extends boolean = false
  */
 export const runSessionArchiveAction = <ThrowOnError extends boolean = false>(options: Options<RunSessionArchiveActionData, ThrowOnError>): RequestResult<RunSessionArchiveActionResponses, unknown, ThrowOnError> => (options.client ?? client).post<RunSessionArchiveActionResponses, unknown, ThrowOnError>({
     requestValidator: async (data) => await z.object({
-        body: zRunSessionArchiveActionBody,
+        body: z.never().optional(),
         path: zRunSessionArchiveActionPath,
         query: z.never().optional()
     }).parseAsync(data),
     url: '/api/v1/sessions/{session_id}:archive',
+    ...options
+});
+
+/**
+ * Run a session action
+ */
+export const runSessionCancelAction = <ThrowOnError extends boolean = false>(options: Options<RunSessionCancelActionData, ThrowOnError>): RequestResult<RunSessionCancelActionResponses, unknown, ThrowOnError> => (options.client ?? client).post<RunSessionCancelActionResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: zRunSessionCancelActionBody.optional(),
+        path: zRunSessionCancelActionPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    url: '/api/v1/sessions/{session_id}:cancel',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -766,7 +1353,76 @@ export const runSessionArchiveAction = <ThrowOnError extends boolean = false>(op
 });
 
 /**
- * Filesystem action dispatcher. Supported actions: list, read, list_many, stat, stat_many, mkdir, search, grep, git_status, diff, open, open-in, reveal. The request and response schemas depend on the `fs:<action>` path tail and are represented as OpenAPI `oneOf` unions.
+ * Run a session action
+ */
+export const runSessionContinueAction = <ThrowOnError extends boolean = false>(options: Options<RunSessionContinueActionData, ThrowOnError>): RequestResult<RunSessionContinueActionResponses, unknown, ThrowOnError> => (options.client ?? client).post<RunSessionContinueActionResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zRunSessionContinueActionPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    url: '/api/v1/sessions/{session_id}:continue',
+    ...options
+});
+
+/**
+ * Run a session action
+ */
+export const runSessionDeleteAction = <ThrowOnError extends boolean = false>(options: Options<RunSessionDeleteActionData, ThrowOnError>): RequestResult<RunSessionDeleteActionResponses, unknown, ThrowOnError> => (options.client ?? client).post<RunSessionDeleteActionResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zRunSessionDeleteActionPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    url: '/api/v1/sessions/{session_id}:delete',
+    ...options
+});
+
+/**
+ * Run a session action
+ */
+export const runSessionReloadAction = <ThrowOnError extends boolean = false>(options: Options<RunSessionReloadActionData, ThrowOnError>): RequestResult<RunSessionReloadActionResponses, unknown, ThrowOnError> => (options.client ?? client).post<RunSessionReloadActionResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zRunSessionReloadActionPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    url: '/api/v1/sessions/{session_id}:reload',
+    ...options
+});
+
+/**
+ * Run a session action
+ */
+export const runSessionTakeoverAction = <ThrowOnError extends boolean = false>(options: Options<RunSessionTakeoverActionData, ThrowOnError>): RequestResult<RunSessionTakeoverActionResponses, unknown, ThrowOnError> => (options.client ?? client).post<RunSessionTakeoverActionResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zRunSessionTakeoverActionPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    url: '/api/v1/sessions/{session_id}:takeover',
+    ...options
+});
+
+/**
+ * Run a session action
+ */
+export const runSessionWaitAction = <ThrowOnError extends boolean = false>(options: Options<RunSessionWaitActionData, ThrowOnError>): RequestResult<RunSessionWaitActionResponses, unknown, ThrowOnError> => (options.client ?? client).post<RunSessionWaitActionResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: zRunSessionWaitActionBody.optional(),
+        path: zRunSessionWaitActionPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    url: '/api/v1/sessions/{session_id}:wait',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Filesystem action dispatcher. Supported actions: list, read, list_many, stat, stat_many, mkdir, search, grep, git_status, git_status:batch, pull_request, pull_request:batch, diff, open, open-in, reveal. The request and response schemas depend on the `fs:<action>` path tail and are represented as OpenAPI `oneOf` unions.
  */
 export const fsAction = <ThrowOnError extends boolean = false>(options: Options<FsActionData, ThrowOnError>): RequestResult<FsActionResponses, unknown, ThrowOnError> => (options.client ?? client).post<FsActionResponses, unknown, ThrowOnError>({
     requestValidator: async (data) => await z.object({
@@ -783,63 +1439,94 @@ export const fsAction = <ThrowOnError extends boolean = false>(options: Options<
 });
 
 /**
- * List pending approval requests for a session
+ * Close a side-channel (btw) agent
  */
-export const getApiV1SessionsBySessionIdApprovals = <ThrowOnError extends boolean = false>(options: Options<GetApiV1SessionsBySessionIdApprovalsData, ThrowOnError>): RequestResult<GetApiV1SessionsBySessionIdApprovalsResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiV1SessionsBySessionIdApprovalsResponses, unknown, ThrowOnError>({
+export const runAgentCloseAction = <ThrowOnError extends boolean = false>(options: Options<RunAgentCloseActionData, ThrowOnError>): RequestResult<RunAgentCloseActionResponses, unknown, ThrowOnError> => (options.client ?? client).post<RunAgentCloseActionResponses, unknown, ThrowOnError>({
     requestValidator: async (data) => await z.object({
         body: z.never().optional(),
-        path: zGetApiV1SessionsBySessionIdApprovalsPath,
-        query: zGetApiV1SessionsBySessionIdApprovalsQuery
+        path: zRunAgentCloseActionPath,
+        query: z.never().optional()
     }).parseAsync(data),
-    url: '/api/v1/sessions/{session_id}/approvals',
+    url: '/api/v1/sessions/{session_id}/agents/{agent_id}:close',
     ...options
 });
 
 /**
- * Resolve an approval request
+ * One page of an agent's turns, oldest first: the latest page, or the turns whose ordinal is below before_ordinal. A page stays within 1 MiB, so it can hold fewer than page_size turns
  */
-export const postApiV1SessionsBySessionIdApprovalsByApprovalId = <ThrowOnError extends boolean = false>(options: Options<PostApiV1SessionsBySessionIdApprovalsByApprovalIdData, ThrowOnError>): RequestResult<PostApiV1SessionsBySessionIdApprovalsByApprovalIdResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiV1SessionsBySessionIdApprovalsByApprovalIdResponses, unknown, ThrowOnError>({
-    requestValidator: async (data) => await z.object({
-        body: zPostApiV1SessionsBySessionIdApprovalsByApprovalIdBody,
-        path: zPostApiV1SessionsBySessionIdApprovalsByApprovalIdPath,
-        query: z.never().optional()
-    }).parseAsync(data),
-    url: '/api/v1/sessions/{session_id}/approvals/{approval_id}',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
-
-/**
- * List child sessions
- */
-export const getApiV1SessionsBySessionIdChildren = <ThrowOnError extends boolean = false>(options: Options<GetApiV1SessionsBySessionIdChildrenData, ThrowOnError>): RequestResult<GetApiV1SessionsBySessionIdChildrenResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiV1SessionsBySessionIdChildrenResponses, unknown, ThrowOnError>({
+export const getApiV1SessionsBySessionIdAgentsByAgentIdTurns = <ThrowOnError extends boolean = false>(options: Options<GetApiV1SessionsBySessionIdAgentsByAgentIdTurnsData, ThrowOnError>): RequestResult<GetApiV1SessionsBySessionIdAgentsByAgentIdTurnsResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiV1SessionsBySessionIdAgentsByAgentIdTurnsResponses, unknown, ThrowOnError>({
     requestValidator: async (data) => await z.object({
         body: z.never().optional(),
-        path: zGetApiV1SessionsBySessionIdChildrenPath,
-        query: zGetApiV1SessionsBySessionIdChildrenQuery
+        path: zGetApiV1SessionsBySessionIdAgentsByAgentIdTurnsPath,
+        query: zGetApiV1SessionsBySessionIdAgentsByAgentIdTurnsQuery.optional()
     }).parseAsync(data),
-    url: '/api/v1/sessions/{session_id}/children',
+    url: '/api/v1/sessions/{session_id}/agents/{agent_id}/turns',
     ...options
 });
 
 /**
- * Create a child session
+ * List context block outlines and composition summary for a session agent
  */
-export const postApiV1SessionsBySessionIdChildren = <ThrowOnError extends boolean = false>(options: Options<PostApiV1SessionsBySessionIdChildrenData, ThrowOnError>): RequestResult<PostApiV1SessionsBySessionIdChildrenResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiV1SessionsBySessionIdChildrenResponses, unknown, ThrowOnError>({
+export const getApiV1SessionsBySessionIdContextItems = <ThrowOnError extends boolean = false>(options: Options<GetApiV1SessionsBySessionIdContextItemsData, ThrowOnError>): RequestResult<GetApiV1SessionsBySessionIdContextItemsResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiV1SessionsBySessionIdContextItemsResponses, unknown, ThrowOnError>({
     requestValidator: async (data) => await z.object({
-        body: zPostApiV1SessionsBySessionIdChildrenBody,
-        path: zPostApiV1SessionsBySessionIdChildrenPath,
+        body: z.never().optional(),
+        path: zGetApiV1SessionsBySessionIdContextItemsPath,
+        query: zGetApiV1SessionsBySessionIdContextItemsQuery.optional()
+    }).parseAsync(data),
+    url: '/api/v1/sessions/{session_id}/context/items',
+    ...options
+});
+
+/**
+ * Get full parsed and raw content for a single context item
+ */
+export const getApiV1SessionsBySessionIdContextItemsByItemId = <ThrowOnError extends boolean = false>(options: Options<GetApiV1SessionsBySessionIdContextItemsByItemIdData, ThrowOnError>): RequestResult<GetApiV1SessionsBySessionIdContextItemsByItemIdResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiV1SessionsBySessionIdContextItemsByItemIdResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zGetApiV1SessionsBySessionIdContextItemsByItemIdPath,
+        query: zGetApiV1SessionsBySessionIdContextItemsByItemIdQuery.optional()
+    }).parseAsync(data),
+    url: '/api/v1/sessions/{session_id}/context/items/{item_id}',
+    ...options
+});
+
+/**
+ * Get lightweight context composition summary for a session agent
+ */
+export const getApiV1SessionsBySessionIdContextSummary = <ThrowOnError extends boolean = false>(options: Options<GetApiV1SessionsBySessionIdContextSummaryData, ThrowOnError>): RequestResult<GetApiV1SessionsBySessionIdContextSummaryResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiV1SessionsBySessionIdContextSummaryResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zGetApiV1SessionsBySessionIdContextSummaryPath,
+        query: zGetApiV1SessionsBySessionIdContextSummaryQuery.optional()
+    }).parseAsync(data),
+    url: '/api/v1/sessions/{session_id}/context/summary',
+    ...options
+});
+
+/**
+ * Get the main agent environment binding
+ */
+export const getApiV1SessionsBySessionIdEnvironment = <ThrowOnError extends boolean = false>(options: Options<GetApiV1SessionsBySessionIdEnvironmentData, ThrowOnError>): RequestResult<GetApiV1SessionsBySessionIdEnvironmentResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiV1SessionsBySessionIdEnvironmentResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zGetApiV1SessionsBySessionIdEnvironmentPath,
         query: z.never().optional()
     }).parseAsync(data),
-    url: '/api/v1/sessions/{session_id}/children',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
+    url: '/api/v1/sessions/{session_id}/environment',
+    ...options
+});
+
+/**
+ * List the environments available to the session
+ */
+export const getApiV1SessionsBySessionIdEnvironments = <ThrowOnError extends boolean = false>(options: Options<GetApiV1SessionsBySessionIdEnvironmentsData, ThrowOnError>): RequestResult<GetApiV1SessionsBySessionIdEnvironmentsResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiV1SessionsBySessionIdEnvironmentsResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zGetApiV1SessionsBySessionIdEnvironmentsPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    url: '/api/v1/sessions/{session_id}/environments',
+    ...options
 });
 
 /**
@@ -888,7 +1575,7 @@ export const getApiV1SessionsBySessionIdFileHistoryContent = <ThrowOnError exten
 /**
  * Download a file from the session workspace
  */
-export const downloadFile = <ThrowOnError extends boolean = false>(options: Options<DownloadFileData, ThrowOnError>): RequestResult<DownloadFileResponses, unknown, ThrowOnError> => (options.client ?? client).get<DownloadFileResponses, unknown, ThrowOnError>({
+export const downloadFile = <ThrowOnError extends boolean = false>(options: Options<DownloadFileData, ThrowOnError>): RequestResult<DownloadFileResponses, DownloadFileErrors, ThrowOnError> => (options.client ?? client).get<DownloadFileResponses, DownloadFileErrors, ThrowOnError>({
     requestValidator: async (data) => await z.object({
         body: z.never().optional(),
         path: zDownloadFilePath,
@@ -899,16 +1586,33 @@ export const downloadFile = <ThrowOnError extends boolean = false>(options: Opti
 });
 
 /**
- * Get the current session goal (null when none is active)
+ * List pending approval and question interactions for a session
  */
-export const getApiV1SessionsBySessionIdGoal = <ThrowOnError extends boolean = false>(options: Options<GetApiV1SessionsBySessionIdGoalData, ThrowOnError>): RequestResult<GetApiV1SessionsBySessionIdGoalResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiV1SessionsBySessionIdGoalResponses, unknown, ThrowOnError>({
+export const listSessionInteractions = <ThrowOnError extends boolean = false>(options: Options<ListSessionInteractionsData, ThrowOnError>): RequestResult<ListSessionInteractionsResponses, unknown, ThrowOnError> => (options.client ?? client).get<ListSessionInteractionsResponses, unknown, ThrowOnError>({
     requestValidator: async (data) => await z.object({
         body: z.never().optional(),
-        path: zGetApiV1SessionsBySessionIdGoalPath,
+        path: zListSessionInteractionsPath,
         query: z.never().optional()
     }).parseAsync(data),
-    url: '/api/v1/sessions/{session_id}/goal',
+    url: '/api/v1/sessions/{session_id}/interactions',
     ...options
+});
+
+/**
+ * Respond to a pending approval or question
+ */
+export const postApiV1SessionsBySessionIdInteractionsByInteractionId = <ThrowOnError extends boolean = false>(options: Options<PostApiV1SessionsBySessionIdInteractionsByInteractionIdData, ThrowOnError>): RequestResult<PostApiV1SessionsBySessionIdInteractionsByInteractionIdResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiV1SessionsBySessionIdInteractionsByInteractionIdResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: zPostApiV1SessionsBySessionIdInteractionsByInteractionIdBody,
+        path: zPostApiV1SessionsBySessionIdInteractionsByInteractionIdPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    url: '/api/v1/sessions/{session_id}/interactions/{interaction_id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
 });
 
 /**
@@ -921,45 +1625,6 @@ export const getApiV1SessionsBySessionIdMediaByFileId = <ThrowOnError extends bo
         query: z.never().optional()
     }).parseAsync(data),
     url: '/api/v1/sessions/{session_id}/media/{file_id}',
-    ...options
-});
-
-/**
- * List messages for a session
- */
-export const getApiV1SessionsBySessionIdMessages = <ThrowOnError extends boolean = false>(options: Options<GetApiV1SessionsBySessionIdMessagesData, ThrowOnError>): RequestResult<GetApiV1SessionsBySessionIdMessagesResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiV1SessionsBySessionIdMessagesResponses, unknown, ThrowOnError>({
-    requestValidator: async (data) => await z.object({
-        body: z.never().optional(),
-        path: zGetApiV1SessionsBySessionIdMessagesPath,
-        query: zGetApiV1SessionsBySessionIdMessagesQuery.optional()
-    }).parseAsync(data),
-    url: '/api/v1/sessions/{session_id}/messages',
-    ...options
-});
-
-/**
- * Get a message by ID
- */
-export const getApiV1SessionsBySessionIdMessagesByMessageId = <ThrowOnError extends boolean = false>(options: Options<GetApiV1SessionsBySessionIdMessagesByMessageIdData, ThrowOnError>): RequestResult<GetApiV1SessionsBySessionIdMessagesByMessageIdResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiV1SessionsBySessionIdMessagesByMessageIdResponses, unknown, ThrowOnError>({
-    requestValidator: async (data) => await z.object({
-        body: z.never().optional(),
-        path: zGetApiV1SessionsBySessionIdMessagesByMessageIdPath,
-        query: z.never().optional()
-    }).parseAsync(data),
-    url: '/api/v1/sessions/{session_id}/messages/{message_id}',
-    ...options
-});
-
-/**
- * Get session profile
- */
-export const getApiV1SessionsBySessionIdProfile = <ThrowOnError extends boolean = false>(options: Options<GetApiV1SessionsBySessionIdProfileData, ThrowOnError>): RequestResult<GetApiV1SessionsBySessionIdProfileResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiV1SessionsBySessionIdProfileResponses, unknown, ThrowOnError>({
-    requestValidator: async (data) => await z.object({
-        body: z.never().optional(),
-        path: zGetApiV1SessionsBySessionIdProfilePath,
-        query: z.never().optional()
-    }).parseAsync(data),
-    url: '/api/v1/sessions/{session_id}/profile',
     ...options
 });
 
@@ -1028,7 +1693,7 @@ export const steerPrompts = <ThrowOnError extends boolean = false>(options: Opti
 });
 
 /**
- * Abort a running prompt or steer a queued prompt
+ * Abort a prompt by prompt_id
  */
 export const promptAction = <ThrowOnError extends boolean = false>(options: Options<PromptActionData, ThrowOnError>): RequestResult<PromptActionResponses, unknown, ThrowOnError> => (options.client ?? client).post<PromptActionResponses, unknown, ThrowOnError>({
     requestValidator: async (data) => await z.object({
@@ -1041,58 +1706,15 @@ export const promptAction = <ThrowOnError extends boolean = false>(options: Opti
 });
 
 /**
- * List pending question requests for a session
+ * Evaluate the latest completed transcript turn, or report a displayed rating and its final answer
  */
-export const getApiV1SessionsBySessionIdQuestions = <ThrowOnError extends boolean = false>(options: Options<GetApiV1SessionsBySessionIdQuestionsData, ThrowOnError>): RequestResult<GetApiV1SessionsBySessionIdQuestionsResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiV1SessionsBySessionIdQuestionsResponses, unknown, ThrowOnError>({
+export const postApiV1SessionsBySessionIdRating = <ThrowOnError extends boolean = false>(options: Options<PostApiV1SessionsBySessionIdRatingData, ThrowOnError>): RequestResult<PostApiV1SessionsBySessionIdRatingResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiV1SessionsBySessionIdRatingResponses, unknown, ThrowOnError>({
     requestValidator: async (data) => await z.object({
-        body: z.never().optional(),
-        path: zGetApiV1SessionsBySessionIdQuestionsPath,
-        query: zGetApiV1SessionsBySessionIdQuestionsQuery
-    }).parseAsync(data),
-    url: '/api/v1/sessions/{session_id}/questions',
-    ...options
-});
-
-/**
- * Resolve or dismiss a question Resolve uses the question response body; `:dismiss` sends an empty body.
- */
-export const postApiV1SessionsBySessionIdQuestionsByTail = <ThrowOnError extends boolean = false>(options: Options<PostApiV1SessionsBySessionIdQuestionsByTailData, ThrowOnError>): RequestResult<PostApiV1SessionsBySessionIdQuestionsByTailResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiV1SessionsBySessionIdQuestionsByTailResponses, unknown, ThrowOnError>({
-    requestValidator: async (data) => await z.object({
-        body: zPostApiV1SessionsBySessionIdQuestionsByTailBody.optional(),
-        path: zPostApiV1SessionsBySessionIdQuestionsByTailPath,
+        body: zPostApiV1SessionsBySessionIdRatingBody,
+        path: zPostApiV1SessionsBySessionIdRatingPath,
         query: z.never().optional()
     }).parseAsync(data),
-    url: '/api/v1/sessions/{session_id}/questions/{tail}',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
-
-/**
- * Get the main agent runtime binding
- */
-export const getApiV1SessionsBySessionIdRuntime = <ThrowOnError extends boolean = false>(options: Options<GetApiV1SessionsBySessionIdRuntimeData, ThrowOnError>): RequestResult<GetApiV1SessionsBySessionIdRuntimeResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiV1SessionsBySessionIdRuntimeResponses, unknown, ThrowOnError>({
-    requestValidator: async (data) => await z.object({
-        body: z.never().optional(),
-        path: zGetApiV1SessionsBySessionIdRuntimePath,
-        query: z.never().optional()
-    }).parseAsync(data),
-    url: '/api/v1/sessions/{session_id}/runtime',
-    ...options
-});
-
-/**
- * Switch the main agent runtime binding
- */
-export const postApiV1SessionsBySessionIdRuntime = <ThrowOnError extends boolean = false>(options: Options<PostApiV1SessionsBySessionIdRuntimeData, ThrowOnError>): RequestResult<PostApiV1SessionsBySessionIdRuntimeResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiV1SessionsBySessionIdRuntimeResponses, unknown, ThrowOnError>({
-    requestValidator: async (data) => await z.object({
-        body: zPostApiV1SessionsBySessionIdRuntimeBody,
-        path: zPostApiV1SessionsBySessionIdRuntimePath,
-        query: z.never().optional()
-    }).parseAsync(data),
-    url: '/api/v1/sessions/{session_id}/runtime',
+    url: '/api/v1/sessions/{session_id}/rating',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -1131,124 +1753,20 @@ export const activateSkill = <ThrowOnError extends boolean = false>(options: Opt
 });
 
 /**
- * Atomic session snapshot for client rebuild: state + as_of_seq watermark + epoch
+ * Steer a message into the active turn
  */
-export const getApiV1SessionsBySessionIdSnapshot = <ThrowOnError extends boolean = false>(options: Options<GetApiV1SessionsBySessionIdSnapshotData, ThrowOnError>): RequestResult<GetApiV1SessionsBySessionIdSnapshotResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiV1SessionsBySessionIdSnapshotResponses, unknown, ThrowOnError>({
+export const steerPromptContent = <ThrowOnError extends boolean = false>(options: Options<SteerPromptContentData, ThrowOnError>): RequestResult<SteerPromptContentResponses, unknown, ThrowOnError> => (options.client ?? client).post<SteerPromptContentResponses, unknown, ThrowOnError>({
     requestValidator: async (data) => await z.object({
-        body: z.never().optional(),
-        path: zGetApiV1SessionsBySessionIdSnapshotPath,
+        body: zSteerPromptContentBody,
+        path: zSteerPromptContentPath,
         query: z.never().optional()
     }).parseAsync(data),
-    url: '/api/v1/sessions/{session_id}/snapshot',
-    ...options
-});
-
-/**
- * Get realtime session status (best-effort in this slice)
- */
-export const getApiV1SessionsBySessionIdStatus = <ThrowOnError extends boolean = false>(options: Options<GetApiV1SessionsBySessionIdStatusData, ThrowOnError>): RequestResult<GetApiV1SessionsBySessionIdStatusResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiV1SessionsBySessionIdStatusResponses, unknown, ThrowOnError>({
-    requestValidator: async (data) => await z.object({
-        body: z.never().optional(),
-        path: zGetApiV1SessionsBySessionIdStatusPath,
-        query: z.never().optional()
-    }).parseAsync(data),
-    url: '/api/v1/sessions/{session_id}/status',
-    ...options
-});
-
-/**
- * List tasks for a session
- */
-export const getApiV1SessionsBySessionIdTasks = <ThrowOnError extends boolean = false>(options: Options<GetApiV1SessionsBySessionIdTasksData, ThrowOnError>): RequestResult<GetApiV1SessionsBySessionIdTasksResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiV1SessionsBySessionIdTasksResponses, unknown, ThrowOnError>({
-    requestValidator: async (data) => await z.object({
-        body: z.never().optional(),
-        path: zGetApiV1SessionsBySessionIdTasksPath,
-        query: zGetApiV1SessionsBySessionIdTasksQuery.optional()
-    }).parseAsync(data),
-    url: '/api/v1/sessions/{session_id}/tasks',
-    ...options
-});
-
-/**
- * Run a task action
- */
-export const runTaskAction = <ThrowOnError extends boolean = false>(options: Options<RunTaskActionData, ThrowOnError>): RequestResult<RunTaskActionResponses, unknown, ThrowOnError> => (options.client ?? client).post<RunTaskActionResponses, unknown, ThrowOnError>({
-    requestValidator: async (data) => await z.object({
-        body: z.never().optional(),
-        path: zRunTaskActionPath,
-        query: z.never().optional()
-    }).parseAsync(data),
-    url: '/api/v1/sessions/{session_id}/tasks/{tail}',
-    ...options
-});
-
-/**
- * Get a task by ID
- */
-export const getApiV1SessionsBySessionIdTasksByTaskId = <ThrowOnError extends boolean = false>(options: Options<GetApiV1SessionsBySessionIdTasksByTaskIdData, ThrowOnError>): RequestResult<GetApiV1SessionsBySessionIdTasksByTaskIdResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiV1SessionsBySessionIdTasksByTaskIdResponses, unknown, ThrowOnError>({
-    requestValidator: async (data) => await z.object({
-        body: z.never().optional(),
-        path: zGetApiV1SessionsBySessionIdTasksByTaskIdPath,
-        query: zGetApiV1SessionsBySessionIdTasksByTaskIdQuery.optional()
-    }).parseAsync(data),
-    url: '/api/v1/sessions/{session_id}/tasks/{task_id}',
-    ...options
-});
-
-/**
- * List terminals for a session
- */
-export const getApiV1SessionsBySessionIdTerminals = <ThrowOnError extends boolean = false>(options: Options<GetApiV1SessionsBySessionIdTerminalsData, ThrowOnError>): RequestResult<GetApiV1SessionsBySessionIdTerminalsResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiV1SessionsBySessionIdTerminalsResponses, unknown, ThrowOnError>({
-    requestValidator: async (data) => await z.object({
-        body: z.never().optional(),
-        path: zGetApiV1SessionsBySessionIdTerminalsPath,
-        query: z.never().optional()
-    }).parseAsync(data),
-    url: '/api/v1/sessions/{session_id}/terminals',
-    ...options
-});
-
-/**
- * Create a terminal for a session
- */
-export const postApiV1SessionsBySessionIdTerminals = <ThrowOnError extends boolean = false>(options: Options<PostApiV1SessionsBySessionIdTerminalsData, ThrowOnError>): RequestResult<PostApiV1SessionsBySessionIdTerminalsResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiV1SessionsBySessionIdTerminalsResponses, unknown, ThrowOnError>({
-    requestValidator: async (data) => await z.object({
-        body: zPostApiV1SessionsBySessionIdTerminalsBody,
-        path: zPostApiV1SessionsBySessionIdTerminalsPath,
-        query: z.never().optional()
-    }).parseAsync(data),
-    url: '/api/v1/sessions/{session_id}/terminals',
+    url: '/api/v1/sessions/{session_id}/steer',
     ...options,
     headers: {
         'Content-Type': 'application/json',
         ...options.headers
     }
-});
-
-/**
- * Close a terminal
- */
-export const closeTerminal = <ThrowOnError extends boolean = false>(options: Options<CloseTerminalData, ThrowOnError>): RequestResult<CloseTerminalResponses, unknown, ThrowOnError> => (options.client ?? client).post<CloseTerminalResponses, unknown, ThrowOnError>({
-    requestValidator: async (data) => await z.object({
-        body: z.never().optional(),
-        path: zCloseTerminalPath,
-        query: z.never().optional()
-    }).parseAsync(data),
-    url: '/api/v1/sessions/{session_id}/terminals/{tail}',
-    ...options
-});
-
-/**
- * Get a terminal by ID
- */
-export const getApiV1SessionsBySessionIdTerminalsByTerminalId = <ThrowOnError extends boolean = false>(options: Options<GetApiV1SessionsBySessionIdTerminalsByTerminalIdData, ThrowOnError>): RequestResult<GetApiV1SessionsBySessionIdTerminalsByTerminalIdResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiV1SessionsBySessionIdTerminalsByTerminalIdResponses, unknown, ThrowOnError>({
-    requestValidator: async (data) => await z.object({
-        body: z.never().optional(),
-        path: zGetApiV1SessionsBySessionIdTerminalsByTerminalIdPath,
-        query: z.never().optional()
-    }).parseAsync(data),
-    url: '/api/v1/sessions/{session_id}/terminals/{terminal_id}',
-    ...options
 });
 
 /**
@@ -1269,58 +1787,6 @@ export const postApiV1SessionsBySessionIdTitleGenerate = <ThrowOnError extends b
 });
 
 /**
- * Turn-granular session transcript page: live sessions read the in-memory store (wire-records backfill awaited per requested agent), cold sessions rebuild the requested agent from the persisted wire records
- */
-export const getApiV1SessionsBySessionIdTranscript = <ThrowOnError extends boolean = false>(options: Options<GetApiV1SessionsBySessionIdTranscriptData, ThrowOnError>): RequestResult<GetApiV1SessionsBySessionIdTranscriptResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiV1SessionsBySessionIdTranscriptResponses, unknown, ThrowOnError>({
-    requestValidator: async (data) => await z.object({
-        body: z.never().optional(),
-        path: zGetApiV1SessionsBySessionIdTranscriptPath,
-        query: zGetApiV1SessionsBySessionIdTranscriptQuery
-    }).parseAsync(data),
-    url: '/api/v1/sessions/{session_id}/transcript',
-    ...options
-});
-
-/**
- * Point-to-point transcript catch-up: journaled op batches with seq > since_seq for one agent, oldest first. complete:false means the session is not live or the journal no longer reaches back to since_seq — the caller must fall back to a full transcript refresh
- */
-export const getApiV1SessionsBySessionIdTranscriptOps = <ThrowOnError extends boolean = false>(options: Options<GetApiV1SessionsBySessionIdTranscriptOpsData, ThrowOnError>): RequestResult<GetApiV1SessionsBySessionIdTranscriptOpsResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiV1SessionsBySessionIdTranscriptOpsResponses, unknown, ThrowOnError>({
-    requestValidator: async (data) => await z.object({
-        body: z.never().optional(),
-        path: zGetApiV1SessionsBySessionIdTranscriptOpsPath,
-        query: zGetApiV1SessionsBySessionIdTranscriptOpsQuery
-    }).parseAsync(data),
-    url: '/api/v1/sessions/{session_id}/transcript/ops',
-    ...options
-});
-
-/**
- * Plan information of an agent's ExitPlanMode tool calls: the reviewed plan content, plan file path, offered options, and the review outcome, in timeline order. agent_id required; tool_call_id optional — present narrows the read to that one call (unknown id or non-ExitPlanMode call → 40416), absent lists every call with recoverable plan content. Content is projected from the linked approval interaction (interactive reviews, live or cold), the live tool frame display (auto mode), or the tool result output text (cold rebuilds without an interaction). Live sessions read the in-memory store (history backfill awaited), cold sessions rebuild the agent from the persisted wire records
- */
-export const getApiV1SessionsBySessionIdTranscriptPlan = <ThrowOnError extends boolean = false>(options: Options<GetApiV1SessionsBySessionIdTranscriptPlanData, ThrowOnError>): RequestResult<GetApiV1SessionsBySessionIdTranscriptPlanResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiV1SessionsBySessionIdTranscriptPlanResponses, unknown, ThrowOnError>({
-    requestValidator: async (data) => await z.object({
-        body: z.never().optional(),
-        path: zGetApiV1SessionsBySessionIdTranscriptPlanPath,
-        query: zGetApiV1SessionsBySessionIdTranscriptPlanQuery
-    }).parseAsync(data),
-    url: '/api/v1/sessions/{session_id}/transcript/plan',
-    ...options
-});
-
-/**
- * All turn-opening inputs ("user messages") of a session, grouped per agent: every turn with a defined prompt (real user text, user-slash skill/plugin commands, cron prompts — distinguish via origin), plus attachment-only prompts projected with an empty prompt string. agent_id optional: present reads one agent, absent reads every rostered agent. Live sessions answer from the in-memory store (history backfill awaited per agent), cold sessions rebuild from the persisted wire records. Unpaginated; attachment entities referenced by the messages ride along (metadata only)
- */
-export const getApiV1SessionsBySessionIdTranscriptUserMessages = <ThrowOnError extends boolean = false>(options: Options<GetApiV1SessionsBySessionIdTranscriptUserMessagesData, ThrowOnError>): RequestResult<GetApiV1SessionsBySessionIdTranscriptUserMessagesResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiV1SessionsBySessionIdTranscriptUserMessagesResponses, unknown, ThrowOnError>({
-    requestValidator: async (data) => await z.object({
-        body: z.never().optional(),
-        path: zGetApiV1SessionsBySessionIdTranscriptUserMessagesPath,
-        query: zGetApiV1SessionsBySessionIdTranscriptUserMessagesQuery.optional()
-    }).parseAsync(data),
-    url: '/api/v1/sessions/{session_id}/transcript/user-messages',
-    ...options
-});
-
-/**
  * Get session-level warnings (e.g. oversized AGENTS.md)
  */
 export const getApiV1SessionsBySessionIdWarnings = <ThrowOnError extends boolean = false>(options: Options<GetApiV1SessionsBySessionIdWarningsData, ThrowOnError>): RequestResult<GetApiV1SessionsBySessionIdWarningsResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiV1SessionsBySessionIdWarningsResponses, unknown, ThrowOnError>({
@@ -1334,13 +1800,13 @@ export const getApiV1SessionsBySessionIdWarnings = <ThrowOnError extends boolean
 });
 
 /**
- * Gracefully shut down the server
+ * Gracefully shut down the server; with if_idle=true, only when it has no live work (ok: false otherwise)
  */
 export const postApiV1Shutdown = <ThrowOnError extends boolean = false>(options?: Options<PostApiV1ShutdownData, ThrowOnError>): RequestResult<PostApiV1ShutdownResponses, unknown, ThrowOnError> => (options?.client ?? client).post<PostApiV1ShutdownResponses, unknown, ThrowOnError>({
     requestValidator: async (data) => await z.object({
         body: z.never().optional(),
         path: z.never().optional(),
-        query: z.never().optional()
+        query: zPostApiV1ShutdownQuery.optional()
     }).parseAsync(data),
     url: '/api/v1/shutdown',
     ...options
@@ -1357,6 +1823,23 @@ export const getApiV1Tools = <ThrowOnError extends boolean = false>(options?: Op
     }).parseAsync(data),
     url: '/api/v1/tools',
     ...options
+});
+
+/**
+ * List files and directories in a workspace without a session. `workspace` accepts a registered workspace id or an absolute root (registered on the spot).
+ */
+export const workspaceFsList = <ThrowOnError extends boolean = false>(options: Options<WorkspaceFsListData, ThrowOnError>): RequestResult<WorkspaceFsListResponses, unknown, ThrowOnError> => (options.client ?? client).post<WorkspaceFsListResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: zWorkspaceFsListBody,
+        path: z.never().optional(),
+        query: z.never().optional()
+    }).parseAsync(data),
+    url: '/api/v1/workspace/fs:list',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
 });
 
 /**
@@ -1394,20 +1877,20 @@ export const workspaceFsSuggest = <ThrowOnError extends boolean = false>(options
 });
 
 /**
- * List registered workspaces
+ * List registered workspaces. hosts=include adds the projects created on each SSH host, tagged with host_id
  */
 export const getApiV1Workspaces = <ThrowOnError extends boolean = false>(options?: Options<GetApiV1WorkspacesData, ThrowOnError>): RequestResult<GetApiV1WorkspacesResponses, unknown, ThrowOnError> => (options?.client ?? client).get<GetApiV1WorkspacesResponses, unknown, ThrowOnError>({
     requestValidator: async (data) => await z.object({
         body: z.never().optional(),
         path: z.never().optional(),
-        query: z.never().optional()
+        query: zGetApiV1WorkspacesQuery.optional()
     }).parseAsync(data),
     url: '/api/v1/workspaces',
     ...options
 });
 
 /**
- * Register a workspace (idempotent on root)
+ * Register a workspace (fresh id per call; retry-safe via idempotency_key)
  */
 export const postApiV1Workspaces = <ThrowOnError extends boolean = false>(options: Options<PostApiV1WorkspacesData, ThrowOnError>): RequestResult<PostApiV1WorkspacesResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiV1WorkspacesResponses, unknown, ThrowOnError>({
     requestValidator: async (data) => await z.object({
@@ -1437,7 +1920,7 @@ export const deleteApiV1WorkspacesByWorkspaceId = <ThrowOnError extends boolean 
 });
 
 /**
- * Rename a workspace (display name only)
+ * Update a workspace name and/or source folders (full replace)
  */
 export const patchApiV1WorkspacesByWorkspaceId = <ThrowOnError extends boolean = false>(options: Options<PatchApiV1WorkspacesByWorkspaceIdData, ThrowOnError>): RequestResult<PatchApiV1WorkspacesByWorkspaceIdResponses, unknown, ThrowOnError> => (options.client ?? client).patch<PatchApiV1WorkspacesByWorkspaceIdResponses, unknown, ThrowOnError>({
     requestValidator: async (data) => await z.object({
@@ -1454,15 +1937,15 @@ export const patchApiV1WorkspacesByWorkspaceId = <ThrowOnError extends boolean =
 });
 
 /**
- * Add an additional directory to the workspace
+ * Promote a source folder to the primary directory (atomic swap; id and bucket unchanged)
  */
-export const postApiV1WorkspacesByWorkspaceIdAddDir = <ThrowOnError extends boolean = false>(options: Options<PostApiV1WorkspacesByWorkspaceIdAddDirData, ThrowOnError>): RequestResult<PostApiV1WorkspacesByWorkspaceIdAddDirResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiV1WorkspacesByWorkspaceIdAddDirResponses, unknown, ThrowOnError>({
+export const postApiV1WorkspacesByWorkspaceIdPrimary = <ThrowOnError extends boolean = false>(options: Options<PostApiV1WorkspacesByWorkspaceIdPrimaryData, ThrowOnError>): RequestResult<PostApiV1WorkspacesByWorkspaceIdPrimaryResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiV1WorkspacesByWorkspaceIdPrimaryResponses, unknown, ThrowOnError>({
     requestValidator: async (data) => await z.object({
-        body: zPostApiV1WorkspacesByWorkspaceIdAddDirBody,
-        path: zPostApiV1WorkspacesByWorkspaceIdAddDirPath,
+        body: zPostApiV1WorkspacesByWorkspaceIdPrimaryBody,
+        path: zPostApiV1WorkspacesByWorkspaceIdPrimaryPath,
         query: z.never().optional()
     }).parseAsync(data),
-    url: '/api/v1/workspaces/{workspace_id}/add-dir',
+    url: '/api/v1/workspaces/{workspace_id}/primary',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -1510,7 +1993,7 @@ export const postApiV1WorkspacesByWorkspaceIdTrust = <ThrowOnError extends boole
 });
 
 /**
- * Revoke workspace trust (project-level MCP config unloads)
+ * Revoke persisted workspace trust (project-level MCP config unloads unless process or config overrides apply)
  */
 export const postApiV1WorkspacesByWorkspaceIdUntrust = <ThrowOnError extends boolean = false>(options: Options<PostApiV1WorkspacesByWorkspaceIdUntrustData, ThrowOnError>): RequestResult<PostApiV1WorkspacesByWorkspaceIdUntrustResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiV1WorkspacesByWorkspaceIdUntrustResponses, unknown, ThrowOnError>({
     requestValidator: async (data) => await z.object({
@@ -1523,238 +2006,16 @@ export const postApiV1WorkspacesByWorkspaceIdUntrust = <ThrowOnError extends boo
 });
 
 /**
- * Per-server OAuth state over the registry catalog. Omitted `verify` preserves implicit OAuth detection; `verify=false` is fully offline; `verify=true` verifies every candidate. Probes may refresh or invalidate credentials.
+ * Read a project local.toml additional_dir set without mutating anything
  */
-export const getApiV2McpAuthStatuses = <ThrowOnError extends boolean = false>(options?: Options<GetApiV2McpAuthStatusesData, ThrowOnError>): RequestResult<GetApiV2McpAuthStatusesResponses, unknown, ThrowOnError> => (options?.client ?? client).get<GetApiV2McpAuthStatusesResponses, unknown, ThrowOnError>({
+export const getApiV1WorkspacesProjectConfigDirs = <ThrowOnError extends boolean = false>(options: Options<GetApiV1WorkspacesProjectConfigDirsData, ThrowOnError>): RequestResult<GetApiV1WorkspacesProjectConfigDirsResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiV1WorkspacesProjectConfigDirsResponses, unknown, ThrowOnError>({
     requestValidator: async (data) => await z.object({
         body: z.never().optional(),
         path: z.never().optional(),
-        query: zGetApiV2McpAuthStatusesQuery.optional()
+        query: zGetApiV1WorkspacesProjectConfigDirsQuery
     }).parseAsync(data),
-    url: '/api/v2/mcp/auth-statuses',
+    url: '/api/v1/workspaces/project-config-dirs',
     ...options
-});
-
-/**
- * Begin an interactive OAuth flow for a remote server. Answers `authorization-required` with the flow handle + URL, or `already-authorized` when a grant exists.
- */
-export const postApiV2McpAuthBegin = <ThrowOnError extends boolean = false>(options: Options<PostApiV2McpAuthBeginData, ThrowOnError>): RequestResult<PostApiV2McpAuthBeginResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiV2McpAuthBeginResponses, unknown, ThrowOnError>({
-    requestValidator: async (data) => await z.object({
-        body: zPostApiV2McpAuthBeginBody,
-        path: z.never().optional(),
-        query: zPostApiV2McpAuthBeginQuery.optional()
-    }).parseAsync(data),
-    url: '/api/v2/mcp/auth:begin',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
-
-/**
- * Tear down a begun OAuth flow without finishing it; unknown flows are ignored.
- */
-export const postApiV2McpAuthCancel = <ThrowOnError extends boolean = false>(options: Options<PostApiV2McpAuthCancelData, ThrowOnError>): RequestResult<PostApiV2McpAuthCancelResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiV2McpAuthCancelResponses, unknown, ThrowOnError>({
-    requestValidator: async (data) => await z.object({
-        body: zPostApiV2McpAuthCancelBody,
-        path: z.never().optional(),
-        query: z.never().optional()
-    }).parseAsync(data),
-    url: '/api/v2/mcp/auth:cancel',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
-
-/**
- * Await the browser callback of a begun flow and finish the code exchange (`40001` for an unknown `flowId`).
- */
-export const postApiV2McpAuthComplete = <ThrowOnError extends boolean = false>(options: Options<PostApiV2McpAuthCompleteData, ThrowOnError>): RequestResult<PostApiV2McpAuthCompleteResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiV2McpAuthCompleteResponses, unknown, ThrowOnError>({
-    requestValidator: async (data) => await z.object({
-        body: zPostApiV2McpAuthCompleteBody,
-        path: z.never().optional(),
-        query: z.never().optional()
-    }).parseAsync(data),
-    url: '/api/v2/mcp/auth:complete',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
-
-/**
- * Clear the stored credentials of one server; the invalidation event reaches live sessions.
- */
-export const postApiV2McpAuthReset = <ThrowOnError extends boolean = false>(options: Options<PostApiV2McpAuthResetData, ThrowOnError>): RequestResult<PostApiV2McpAuthResetResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiV2McpAuthResetResponses, unknown, ThrowOnError>({
-    requestValidator: async (data) => await z.object({
-        body: zPostApiV2McpAuthResetBody,
-        path: z.never().optional(),
-        query: zPostApiV2McpAuthResetQuery.optional()
-    }).parseAsync(data),
-    url: '/api/v2/mcp/auth:reset',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
-
-/**
- * List every MCP server the management plane knows about (user-level file, plugin manifests; project layers join when `cwd` is given). Read-only entries carry redacted configs.
- */
-export const getApiV2McpServers = <ThrowOnError extends boolean = false>(options?: Options<GetApiV2McpServersData, ThrowOnError>): RequestResult<GetApiV2McpServersResponses, unknown, ThrowOnError> => (options?.client ?? client).get<GetApiV2McpServersResponses, unknown, ThrowOnError>({
-    requestValidator: async (data) => await z.object({
-        body: z.never().optional(),
-        path: z.never().optional(),
-        query: zGetApiV2McpServersQuery.optional()
-    }).parseAsync(data),
-    url: '/api/v2/mcp/servers',
-    ...options
-});
-
-/**
- * Add a server to the user-level `mcp.json`; a same-named read-only entry (plugin / project layer) is rejected. Returns the refreshed list.
- */
-export const postApiV2McpServers = <ThrowOnError extends boolean = false>(options: Options<PostApiV2McpServersData, ThrowOnError>): RequestResult<PostApiV2McpServersResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiV2McpServersResponses, unknown, ThrowOnError>({
-    requestValidator: async (data) => await z.object({
-        body: zPostApiV2McpServersBody,
-        path: z.never().optional(),
-        query: zPostApiV2McpServersQuery.optional()
-    }).parseAsync(data),
-    url: '/api/v2/mcp/servers',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
-
-/**
- * The locator-addressed catalog (redacted configs) plus a batched real-connection probe of every OAuth candidate. `targets` narrows the catalog; omitted inspects all. `cwd` includes trusted project layers.
- */
-export const postApiV2McpServersInspect = <ThrowOnError extends boolean = false>(options: Options<PostApiV2McpServersInspectData, ThrowOnError>): RequestResult<PostApiV2McpServersInspectResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiV2McpServersInspectResponses, unknown, ThrowOnError>({
-    requestValidator: async (data) => await z.object({
-        body: zPostApiV2McpServersInspectBody,
-        path: z.never().optional(),
-        query: z.never().optional()
-    }).parseAsync(data),
-    url: '/api/v2/mcp/servers:inspect',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
-
-/**
- * Probe a real connection to one server: pass `name` to test a registry entry (plugin and project layers included) or an inline `server` config to probe it as-is. Never persists anything.
- */
-export const postApiV2McpServersTest = <ThrowOnError extends boolean = false>(options: Options<PostApiV2McpServersTestData, ThrowOnError>): RequestResult<PostApiV2McpServersTestResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiV2McpServersTestResponses, unknown, ThrowOnError>({
-    requestValidator: async (data) => await z.object({
-        body: zPostApiV2McpServersTestBody,
-        path: z.never().optional(),
-        query: z.never().optional()
-    }).parseAsync(data),
-    url: '/api/v2/mcp/servers:test',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
-
-/**
- * Remove a user-level entry; read-only entries reject the delete. Returns the refreshed list.
- */
-export const deleteApiV2McpServersByName = <ThrowOnError extends boolean = false>(options: Options<DeleteApiV2McpServersByNameData, ThrowOnError>): RequestResult<DeleteApiV2McpServersByNameResponses, unknown, ThrowOnError> => (options.client ?? client).delete<DeleteApiV2McpServersByNameResponses, unknown, ThrowOnError>({
-    requestValidator: async (data) => await z.object({
-        body: z.never().optional(),
-        path: zDeleteApiV2McpServersByNamePath,
-        query: zDeleteApiV2McpServersByNameQuery.optional()
-    }).parseAsync(data),
-    url: '/api/v2/mcp/servers/{name}',
-    ...options
-});
-
-/**
- * Get one MCP server by runtime name (`40408` when unknown).
- */
-export const getApiV2McpServersByName = <ThrowOnError extends boolean = false>(options: Options<GetApiV2McpServersByNameData, ThrowOnError>): RequestResult<GetApiV2McpServersByNameResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiV2McpServersByNameResponses, unknown, ThrowOnError>({
-    requestValidator: async (data) => await z.object({
-        body: z.never().optional(),
-        path: zGetApiV2McpServersByNamePath,
-        query: zGetApiV2McpServersByNameQuery.optional()
-    }).parseAsync(data),
-    url: '/api/v2/mcp/servers/{name}',
-    ...options
-});
-
-/**
- * Replace the user-level entry named in the path (the body carries no `name`); read-only entries reject the write. Returns the refreshed list.
- */
-export const putApiV2McpServersByName = <ThrowOnError extends boolean = false>(options: Options<PutApiV2McpServersByNameData, ThrowOnError>): RequestResult<PutApiV2McpServersByNameResponses, unknown, ThrowOnError> => (options.client ?? client).put<PutApiV2McpServersByNameResponses, unknown, ThrowOnError>({
-    requestValidator: async (data) => await z.object({
-        body: zPutApiV2McpServersByNameBody,
-        path: zPutApiV2McpServersByNamePath,
-        query: zPutApiV2McpServersByNameQuery.optional()
-    }).parseAsync(data),
-    url: '/api/v2/mcp/servers/{name}',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
-
-/**
- * List sessions with domain-grouped metadata (workspace / meta / activity; git via include=git). activity.model carries the live session's bound model alias (null while the session is cold). Paginate with the opaque page_token (binds the first page’s query conditions) or with the stateless 1-based page parameter; every page carries total. fields=id,archived trims each item to the lightweight ids projection (select-all-matching flows; page_size ceiling relaxed to 10000). meta.has_prompt=true|false filters sessions by whether they carry a prompt. view=by_workspace groups the matching set per workspace — each group carries that workspace's first group.page_size sessions (default 5) under the requested sort plus the group's full matching total; page/page_token then page over groups.
- */
-export const getApiV2Sessions = <ThrowOnError extends boolean = false>(options?: Options<GetApiV2SessionsData, ThrowOnError>): RequestResult<GetApiV2SessionsResponses, unknown, ThrowOnError> => (options?.client ?? client).get<GetApiV2SessionsResponses, unknown, ThrowOnError>({
-    requestValidator: async (data) => await z.object({
-        body: z.never().optional(),
-        path: z.never().optional(),
-        query: zGetApiV2SessionsQuery.optional()
-    }).parseAsync(data),
-    url: '/api/v2/sessions',
-    ...options
-});
-
-/**
- * Batch-archive sessions by id ({ ids }, ≤5000 unique). Per-item results — a missing session folds into its own item; cold sessions are patched without materialization.
- */
-export const postApiV2SessionsArchive = <ThrowOnError extends boolean = false>(options: Options<PostApiV2SessionsArchiveData, ThrowOnError>): RequestResult<PostApiV2SessionsArchiveResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiV2SessionsArchiveResponses, unknown, ThrowOnError>({
-    requestValidator: async (data) => await z.object({
-        body: zPostApiV2SessionsArchiveBody,
-        path: z.never().optional(),
-        query: z.never().optional()
-    }).parseAsync(data),
-    url: '/api/v2/sessions:archive',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
-
-/**
- * Batch-restore sessions by id ({ ids }, ≤5000 unique). Per-item results — a missing session folds into its own item; cold sessions are patched without materialization.
- */
-export const postApiV2SessionsRestore = <ThrowOnError extends boolean = false>(options: Options<PostApiV2SessionsRestoreData, ThrowOnError>): RequestResult<PostApiV2SessionsRestoreResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiV2SessionsRestoreResponses, unknown, ThrowOnError>({
-    requestValidator: async (data) => await z.object({
-        body: zPostApiV2SessionsRestoreBody,
-        path: z.never().optional(),
-        query: z.never().optional()
-    }).parseAsync(data),
-    url: '/api/v2/sessions:restore',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
 });
 
 export const getAsyncapiJson = <ThrowOnError extends boolean = false>(options?: Options<GetAsyncapiJsonData, ThrowOnError>): RequestResult<GetAsyncapiJsonResponses, unknown, ThrowOnError> => (options?.client ?? client).get<GetAsyncapiJsonResponses, unknown, ThrowOnError>({

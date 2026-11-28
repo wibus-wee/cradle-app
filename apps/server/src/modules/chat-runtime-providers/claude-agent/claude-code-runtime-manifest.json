@@ -1,55 +1,55 @@
 {
   "schemaVersion": 1,
-  "sdkVersion": "0.3.261",
+  "sdkVersion": "0.3.332",
   "registry": "https://registry.npmjs.org",
   "targets": {
     "darwin-arm64": {
       "packageName": "@anthropic-ai/claude-agent-sdk-darwin-arm64",
-      "tarball": "https://registry.npmjs.org/@anthropic-ai/claude-agent-sdk-darwin-arm64/-/claude-agent-sdk-darwin-arm64-0.3.261.tgz",
-      "unpackedSizeBytes": 199242152,
-      "sha512": "a08f123ddea0fb1505e849c4a88227c73e428d24895e80e56aa79f8db489bd31426b0186061c6542cd20f63cec628bba45dbbe8b6b49053a0964bb0a4a737fd1"
+      "tarball": "https://registry.npmjs.org/@anthropic-ai/claude-agent-sdk-darwin-arm64/-/claude-agent-sdk-darwin-arm64-0.3.332.tgz",
+      "unpackedSizeBytes": 383795864,
+      "sha512": "105a98272835ce98103373717ceb0e2c28b692d9bcb98c20491d433fd0fa67f227950d0a4816d60172ffb35d62b6f2d3023e8f9f5e55785b4d252ec4870e31a6"
     },
     "darwin-x64": {
       "packageName": "@anthropic-ai/claude-agent-sdk-darwin-x64",
-      "tarball": "https://registry.npmjs.org/@anthropic-ai/claude-agent-sdk-darwin-x64/-/claude-agent-sdk-darwin-x64-0.3.261.tgz",
-      "unpackedSizeBytes": 208010016,
-      "sha512": "3ce0dde395dbacac709e079b16673ad1777af100dbef10a8fb4b6861324a7c5ba6536e1bfc94f65a93b9b1349f739f9f6a177f3f5d6ad2e179bfd61e4a35a68e"
+      "tarball": "https://registry.npmjs.org/@anthropic-ai/claude-agent-sdk-darwin-x64/-/claude-agent-sdk-darwin-x64-0.3.332.tgz",
+      "unpackedSizeBytes": 397278640,
+      "sha512": "bc76a721a7e5519e4e1a091e7d88cb8d405f41f89db844c2a85967a6f8770e37a511da69843901bd59989cf2e01f52f1fde01004b6c8c11f33d2aaf2df4bbc0f"
     },
     "linux-arm64": {
       "packageName": "@anthropic-ai/claude-agent-sdk-linux-arm64",
-      "tarball": "https://registry.npmjs.org/@anthropic-ai/claude-agent-sdk-linux-arm64/-/claude-agent-sdk-linux-arm64-0.3.261.tgz",
-      "unpackedSizeBytes": 215212029,
-      "sha512": "0becb7377303d84c6bc2b6c261c6cb74cdfd5646c9910294bf6de8b9bbe866bd02b47887d8b112c94502dc9b146c72754d128ef1f6f32eabcf92367d52c04873"
+      "tarball": "https://registry.npmjs.org/@anthropic-ai/claude-agent-sdk-linux-arm64/-/claude-agent-sdk-linux-arm64-0.3.332.tgz",
+      "unpackedSizeBytes": 385476437,
+      "sha512": "b050291e3b9673ed7ed5c3e812f0bd3a948abfed4bc564098ac8e018adb32155c4fad046612a1d6ec56f84b7cb1c529cde95849ea9bdd10a94a8443ebfee6f58"
     },
     "linux-arm64-musl": {
       "packageName": "@anthropic-ai/claude-agent-sdk-linux-arm64-musl",
-      "tarball": "https://registry.npmjs.org/@anthropic-ai/claude-agent-sdk-linux-arm64-musl/-/claude-agent-sdk-linux-arm64-musl-0.3.261.tgz",
-      "unpackedSizeBytes": 208091387,
-      "sha512": "040506d84ade995cb2f1b035e23285df9551263184d93a9112915eac0d024415a0f7fb142595567662115d489708a87432f7a73d15096c48307071659501133b"
+      "tarball": "https://registry.npmjs.org/@anthropic-ai/claude-agent-sdk-linux-arm64-musl/-/claude-agent-sdk-linux-arm64-musl-0.3.332.tgz",
+      "unpackedSizeBytes": 373171475,
+      "sha512": "765b75fe9159e0f353b2649afdc4b79bf0c3e03d7b7394bb2c4b650f423c51ee236d321d61a35938850e62e961cbd883e04a1ae3bad67cff4bf0c9260ab08c52"
     },
     "linux-x64": {
       "packageName": "@anthropic-ai/claude-agent-sdk-linux-x64",
-      "tarball": "https://registry.npmjs.org/@anthropic-ai/claude-agent-sdk-linux-x64/-/claude-agent-sdk-linux-x64-0.3.261.tgz",
-      "unpackedSizeBytes": 215642173,
-      "sha512": "31da238df3741c91d3d09322649eab4e3dff383362e4e758d29cb525999554455360e76f807e8e1b7a32f7f0669894f1d26a7f0410876ce18da626ed9ea13ed6"
+      "tarball": "https://registry.npmjs.org/@anthropic-ai/claude-agent-sdk-linux-x64/-/claude-agent-sdk-linux-x64-0.3.332.tgz",
+      "unpackedSizeBytes": 402326325,
+      "sha512": "8dccbdfaa1df669f1c865c80cee815083495a0cbf794d22b0f1b96a3cba43364a4656267d29af82bcb1784920a6d422f6c6ad9859798e44ebcccf1cd7e9bfa4b"
     },
     "linux-x64-musl": {
       "packageName": "@anthropic-ai/claude-agent-sdk-linux-x64-musl",
-      "tarball": "https://registry.npmjs.org/@anthropic-ai/claude-agent-sdk-linux-x64-musl/-/claude-agent-sdk-linux-x64-musl-0.3.261.tgz",
-      "unpackedSizeBytes": 209662507,
-      "sha512": "1fbb02b4ced7f4ec90f99084861e9363f6758bee56227f18c874552762eb65114e6acccf7836e5d52cd2c71b8e77989bc09640f60c7edae43bf1dc7e6c391050"
+      "tarball": "https://registry.npmjs.org/@anthropic-ai/claude-agent-sdk-linux-x64-musl/-/claude-agent-sdk-linux-x64-musl-0.3.332.tgz",
+      "unpackedSizeBytes": 386856243,
+      "sha512": "c1e0dfadd6e04150ee20a8e4e24328400db1fbf14f0a95a7a3fe5af6d0ca79883e8dbaa3221969bdfbe78ad7848d588bec655ffd4dd27d3ae31e58f296cbd24a"
     },
     "win32-arm64": {
       "packageName": "@anthropic-ai/claude-agent-sdk-win32-arm64",
-      "tarball": "https://registry.npmjs.org/@anthropic-ai/claude-agent-sdk-win32-arm64/-/claude-agent-sdk-win32-arm64-0.3.261.tgz",
-      "unpackedSizeBytes": 209778920,
-      "sha512": "cef65f79ce3ec03a28a85fd9388de5b6182af567d92c8ad2b1ead2ead50ba41a822ca3516d32290110dc96363b4ab46e3066f7131f8b167ff25dace06a3a70ce"
+      "tarball": "https://registry.npmjs.org/@anthropic-ai/claude-agent-sdk-win32-arm64/-/claude-agent-sdk-win32-arm64-0.3.332.tgz",
+      "unpackedSizeBytes": 389167848,
+      "sha512": "156ccd6ab9760223b336517a15065114c375b7be5e944743b2055fac1fb22253197a83191bd3a116fdfca167e07156d97b81effac47454443969846d14387401"
     },
     "win32-x64": {
       "packageName": "@anthropic-ai/claude-agent-sdk-win32-x64",
-      "tarball": "https://registry.npmjs.org/@anthropic-ai/claude-agent-sdk-win32-x64/-/claude-agent-sdk-win32-x64-0.3.261.tgz",
-      "unpackedSizeBytes": 218729184,
-      "sha512": "b5ea52c0da4db25e2dc83749d7e61c457798ed564d8ab3eaa42b4a0ee876615c0390c7f341ebc2aa88d446d00201d2f023c0545de38669e73045b877ce8494b4"
+      "tarball": "https://registry.npmjs.org/@anthropic-ai/claude-agent-sdk-win32-x64/-/claude-agent-sdk-win32-x64-0.3.332.tgz",
+      "unpackedSizeBytes": 403084000,
+      "sha512": "52001ef72057649537926f12636fe345eb44d7a1e93ed5a111c7e642c712e0f405c2a1af2876e9523219e89f75ee000a03c8e92763d1b433690c7bc2720aceaa"
     }
   }
 }

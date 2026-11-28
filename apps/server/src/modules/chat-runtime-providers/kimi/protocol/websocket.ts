@@ -13,2110 +13,625 @@ export interface KimiWebSocketMessage {
 
 export const KIMI_WEB_SOCKET_MESSAGES = [
   {
-    name: 'abort',
-    title: 'Abort',
-    summary: 'Abort a running prompt in a session.',
-    direction: 'client_to_server',
-    payload: {
-      properties: {
-        id: {
-          type: 'string',
-        },
-        payload: {
-          properties: {
-            prompt_id: {
-              type: 'string',
-            },
-            session_id: {
-              type: 'string',
-            },
-          },
-          required: [
-            'session_id',
-            'prompt_id',
-          ],
-          type: 'object',
-        },
-        type: {
-          const: 'abort',
-          type: 'string',
-        },
-      },
-      required: [
-        'type',
-        'id',
-        'payload',
-      ],
-      type: 'object',
-    },
-  },
-  {
-    name: 'abort.ack',
-    title: 'Abort Ack',
-    summary: 'Acknowledgement for abort.',
+    name: 'agent',
+    title: 'Agent',
+    summary: 'Status (idle, running or compacting), model, thinking effort, permission mode and plan / swarm / tower mode switches of one subscribed agent, sent when a connection starts receiving that agent and on every change; it replaces the client copy. Request retries ride on the running turn.',
     direction: 'server_to_client',
     payload: {
       properties: {
-        code: {
-          maximum: 9007199254740991,
-          minimum: -9007199254740991,
-          type: 'integer',
-        },
-        id: {
+        agent_id: {
+          minLength: 1,
           type: 'string',
         },
-        msg: {
+        compacting: {
+          type: 'boolean',
+        },
+        event_created_at: {
           type: 'string',
         },
-        payload: {
-          properties: {
-            aborted: {
-              type: 'boolean',
-            },
-            at_seq: {
-              maximum: 9007199254740991,
-              minimum: 0,
-              type: 'integer',
-            },
-          },
-          type: 'object',
-        },
-        type: {
-          const: 'ack',
+        model: {
           type: 'string',
         },
-      },
-      required: [
-        'type',
-        'id',
-        'code',
-        'msg',
-        'payload',
-      ],
-      type: 'object',
-    },
-  },
-  {
-    name: 'client_hello',
-    title: 'Client Hello',
-    summary: 'Start a client session and optionally subscribe to existing daemon sessions.',
-    direction: 'client_to_server',
-    payload: {
-      properties: {
-        id: {
-          type: 'string',
-        },
-        payload: {
-          properties: {
-            agent_filter: {
-              additionalProperties: {
-                items: {
-                  type: 'string',
-                },
-                minItems: 1,
-                type: 'array',
-              },
-              propertyNames: {
-                type: 'string',
-              },
-              type: 'object',
-            },
-            client_id: {
-              type: 'string',
-            },
-            cursors: {
-              additionalProperties: {
-                properties: {
-                  epoch: {
-                    minLength: 1,
-                    type: 'string',
-                  },
-                  seq: {
-                    maximum: 9007199254740991,
-                    minimum: 0,
-                    type: 'integer',
-                  },
-                },
-                required: [
-                  'seq',
-                ],
-                type: 'object',
-              },
-              propertyNames: {
-                type: 'string',
-              },
-              type: 'object',
-            },
-            subscriptions: {
-              items: {
-                type: 'string',
-              },
-              type: 'array',
-            },
-          },
-          required: [
-            'client_id',
+        permission_mode: {
+          enum: [
+            'manual',
+            'yolo',
+            'auto',
           ],
-          type: 'object',
+          type: 'string',
+        },
+        plan_mode: {
+          type: 'boolean',
+        },
+        session_id: {
+          minLength: 1,
+          type: 'string',
+        },
+        status: {
+          enum: [
+            'idle',
+            'running',
+            'ended',
+          ],
+          type: 'string',
+        },
+        swarm_mode: {
+          type: 'boolean',
+        },
+        thinking: {
+          type: 'string',
+        },
+        tower_mode: {
+          type: 'boolean',
         },
         type: {
-          const: 'client_hello',
+          const: 'agent',
           type: 'string',
         },
       },
       required: [
+        'status',
+        'compacting',
+        'plan_mode',
+        'swarm_mode',
+        'tower_mode',
         'type',
-        'id',
-        'payload',
+        'session_id',
+        'agent_id',
+        'event_created_at',
       ],
       type: 'object',
     },
   },
   {
-    name: 'client_hello.ack',
-    title: 'Client Hello Ack',
-    summary: 'Acknowledgement for client_hello.',
+    name: 'context',
+    title: 'Context',
+    summary: 'Context window usage of one subscribed agent, sent when a connection starts receiving that agent and then at most a few times per second while it changes; only the latest value matters.',
     direction: 'server_to_client',
     payload: {
       properties: {
-        code: {
-          maximum: 9007199254740991,
-          minimum: -9007199254740991,
-          type: 'integer',
-        },
-        id: {
+        agent_id: {
+          minLength: 1,
           type: 'string',
         },
-        msg: {
-          type: 'string',
-        },
-        payload: {
-          properties: {
-            accepted_subscriptions: {
-              items: {
-                type: 'string',
-              },
-              type: 'array',
-            },
-            cursors: {
-              additionalProperties: {
-                properties: {
-                  epoch: {
-                    minLength: 1,
-                    type: 'string',
-                  },
-                  seq: {
-                    maximum: 9007199254740991,
-                    minimum: 0,
-                    type: 'integer',
-                  },
-                },
-                required: [
-                  'seq',
-                ],
-                type: 'object',
-              },
-              propertyNames: {
-                type: 'string',
-              },
-              type: 'object',
-            },
-            resync_required: {
-              items: {
-                type: 'string',
-              },
-              type: 'array',
-            },
-          },
-          required: [
-            'accepted_subscriptions',
-            'resync_required',
-          ],
-          type: 'object',
-        },
-        type: {
-          const: 'ack',
-          type: 'string',
-        },
-      },
-      required: [
-        'type',
-        'id',
-        'code',
-        'msg',
-        'payload',
-      ],
-      type: 'object',
-    },
-  },
-  {
-    name: 'error',
-    title: 'Error',
-    summary: 'Server-side WebSocket protocol or runtime error.',
-    direction: 'server_to_client',
-    payload: {
-      properties: {
-        payload: {
-          properties: {
-            code: {
-              maximum: 9007199254740991,
-              minimum: -9007199254740991,
-              type: 'integer',
-            },
-            details: {},
-            fatal: {
-              type: 'boolean',
-            },
-            msg: {
-              type: 'string',
-            },
-            request_id: {
-              type: 'string',
-            },
-          },
-          required: [
-            'code',
-            'msg',
-            'fatal',
-          ],
-          type: 'object',
-        },
-        timestamp: {
-          type: 'string',
-        },
-        type: {
-          const: 'error',
-          type: 'string',
-        },
-      },
-      required: [
-        'type',
-        'timestamp',
-        'payload',
-      ],
-      type: 'object',
-    },
-  },
-  {
-    name: 'ping',
-    title: 'Ping',
-    summary: 'Heartbeat ping sent by the server; clients must answer with pong.',
-    direction: 'server_to_client',
-    payload: {
-      properties: {
-        payload: {
-          properties: {
-            nonce: {
-              type: 'string',
-            },
-          },
-          required: [
-            'nonce',
-          ],
-          type: 'object',
-        },
-        timestamp: {
-          type: 'string',
-        },
-        type: {
-          const: 'ping',
-          type: 'string',
-        },
-      },
-      required: [
-        'type',
-        'timestamp',
-        'payload',
-      ],
-      type: 'object',
-    },
-  },
-  {
-    name: 'pong',
-    title: 'Pong',
-    summary: 'Reply to a server ping with the same nonce.',
-    direction: 'client_to_server',
-    payload: {
-      properties: {
-        payload: {
-          properties: {
-            nonce: {
-              type: 'string',
-            },
-          },
-          required: [
-            'nonce',
-          ],
-          type: 'object',
-        },
-        type: {
-          const: 'pong',
-          type: 'string',
-        },
-      },
-      required: [
-        'type',
-        'payload',
-      ],
-      type: 'object',
-    },
-  },
-  {
-    name: 'resync_required',
-    title: 'Resync Required',
-    summary: 'Signals that a client must rebuild local session state from REST history.',
-    direction: 'server_to_client',
-    payload: {
-      properties: {
-        payload: {
-          properties: {
-            current_seq: {
-              maximum: 9007199254740991,
-              minimum: 0,
-              type: 'integer',
-            },
-            epoch: {
-              minLength: 1,
-              type: 'string',
-            },
-            reason: {
-              enum: [
-                'buffer_overflow',
-                'session_recreated',
-                'epoch_changed',
-              ],
-              type: 'string',
-            },
-            session_id: {
-              type: 'string',
-            },
-          },
-          required: [
-            'session_id',
-            'reason',
-            'current_seq',
-          ],
-          type: 'object',
-        },
-        timestamp: {
-          type: 'string',
-        },
-        type: {
-          const: 'resync_required',
-          type: 'string',
-        },
-      },
-      required: [
-        'type',
-        'timestamp',
-        'payload',
-      ],
-      type: 'object',
-    },
-  },
-  {
-    name: 'server_hello',
-    title: 'Server Hello',
-    summary: 'Initial server greeting sent immediately after the socket opens.',
-    direction: 'server_to_client',
-    payload: {
-      properties: {
-        payload: {
-          properties: {
-            capabilities: {
-              properties: {
-                compression: {
-                  type: 'boolean',
-                },
-                event_batching: {
-                  type: 'boolean',
-                },
-              },
-              required: [
-                'event_batching',
-                'compression',
-              ],
-              type: 'object',
-            },
-            heartbeat_ms: {
-              exclusiveMinimum: 0,
-              maximum: 9007199254740991,
-              type: 'integer',
-            },
-            max_event_buffer_size: {
-              exclusiveMinimum: 0,
-              maximum: 9007199254740991,
-              type: 'integer',
-            },
-            protocol_version: {
-              exclusiveMinimum: 0,
-              maximum: 9007199254740991,
-              type: 'integer',
-            },
-            ws_connection_id: {
-              type: 'string',
-            },
-          },
-          required: [
-            'ws_connection_id',
-            'protocol_version',
-            'max_event_buffer_size',
-            'capabilities',
-          ],
-          type: 'object',
-        },
-        timestamp: {
-          type: 'string',
-        },
-        type: {
-          const: 'server_hello',
-          type: 'string',
-        },
-      },
-      required: [
-        'type',
-        'timestamp',
-        'payload',
-      ],
-      type: 'object',
-    },
-  },
-  {
-    name: 'session_event',
-    title: 'Session Event',
-    summary: 'Session-scoped agent event envelope; frame type is the payload event type.',
-    direction: 'server_to_client',
-    payload: {
-      definitions: {
-        __schema0: {
-          properties: {
-            cause: {
-              $ref: '#/definitions/__schema0',
-            },
-            code: {
-              enum: [
-                'config.invalid',
-                'session.not_found',
-                'session.already_exists',
-                'session.id_invalid',
-                'session.id_required',
-                'session.id_empty',
-                'session.title_empty',
-                'session.state_not_found',
-                'session.state_invalid',
-                'session.fork_active_turn',
-                'session.undo_unavailable',
-                'session.export_not_found',
-                'session.export_missing_version',
-                'session.export_output_conflict',
-                'session.export_too_large',
-                'session.closed',
-                'session.permission_mode_invalid',
-                'session.thinking_empty',
-                'session.model_empty',
-                'session.plan_mode_invalid',
-                'session.approval_handler_error',
-                'session.question_handler_error',
-                'session.init_failed',
-                'agent.not_found',
-                'agent.already_exists',
-                'agent.already_running',
-                'agent.not_a_subagent',
-                'agent.not_owned',
-                'agent.type_not_allowed',
-                'agent.max_tokens_exceeded',
-                'activity.agent_busy',
-                'activity.cancelling',
-                'activity.disposing',
-                'activity.disposed',
-                'activity.initializing',
-                'activity.session_rejected',
-                'turn.agent_busy',
-                'goal.already_exists',
-                'goal.not_found',
-                'goal.objective_empty',
-                'goal.objective_too_long',
-                'goal.status_invalid',
-                'goal.metadata_reserved',
-                'goal.not_resumable',
-                'goal.unsupported_agent',
-                'model.not_configured',
-                'model.config_invalid',
-                'profile.thinking_alias_conflict',
-                'model.not_found',
-                'auth.login_required',
-                'auth.provisioning_required',
-                'auth.token_missing',
-                'auth.token_unauthorized',
-                'auth.model_not_resolved',
-                'context.overflow',
-                'loop.max_steps_exceeded',
-                'provider.api_error',
-                'provider.filtered',
-                'provider.rate_limit',
-                'provider.auth_error',
-                'provider.connection_error',
-                'provider.overloaded',
-                'provider.not_found',
-                'skill.not_found',
-                'skill.type_unsupported',
-                'skill.name_empty',
-                'skill.parse_failed',
-                'skill.nested_too_deep',
-                'records.write_failed',
-                'compaction.failed',
-                'compaction.unable',
-                'task.task_id_empty',
-                'task.limit_exceeded',
-                'usage.turn_id_conflict',
-                'mcp.server_not_found',
-                'mcp.server_disabled',
-                'mcp.startup_failed',
-                'mcp.tool_name_collision',
-                'mcp.oauth_failed',
-                'message.not_found',
-                'plugin.not_found',
-                'plugin.load_failed',
-                'request.invalid',
-                'request.work_dir_required',
-                'request.prompt_input_empty',
-                'prompt.id_conflict',
-                'prompt.not_found',
-                'prompt.already_completed',
-                'session.busy',
-                'shell.git_bash_not_found',
-                'workspace.not_found',
-                'terminal.not_found',
-                'file.not_found',
-                'file.too_large',
-                'fs.path_not_found',
-                'fs.permission_denied',
-                'fs.path_escapes',
-                'fs.is_directory',
-                'fs.is_binary',
-                'fs.too_large',
-                'fs.already_exists',
-                'fs.too_many_results',
-                'fs.grep_timeout',
-                'fs.git_unavailable',
-                'wire.migration_missing',
-                'storage.permission_denied',
-                'storage.disk_full',
-                'cron.expression_invalid',
-                'web.invalid_url',
-                'web.private_address',
-                'web.fetch_failed',
-                'validation.failed',
-                'not_implemented',
-                'internal',
-              ],
-              type: 'string',
-            },
-            details: {
-              additionalProperties: {},
-              propertyNames: {
-                type: 'string',
-              },
-              type: 'object',
-            },
-            message: {
-              type: 'string',
-            },
-            name: {
-              type: 'string',
-            },
-            retryable: {
-              type: 'boolean',
-            },
-          },
-          required: [
-            'code',
-            'message',
-            'retryable',
-          ],
-          type: 'object',
-        },
-      },
-      properties: {
-        epoch: {
-          type: 'string',
-        },
-        offset: {
+        context_tokens: {
           maximum: 9007199254740991,
           minimum: 0,
           type: 'integer',
         },
-        payload: {
-          allOf: [
-            {
-              oneOf: [
-                {
-                  properties: {
-                    agentId: {
-                      type: 'string',
-                    },
-                    cause: {
-                      $ref: '#/definitions/__schema0',
-                    },
-                    code: {
-                      enum: [
-                        'config.invalid',
-                        'session.not_found',
-                        'session.already_exists',
-                        'session.id_invalid',
-                        'session.id_required',
-                        'session.id_empty',
-                        'session.title_empty',
-                        'session.state_not_found',
-                        'session.state_invalid',
-                        'session.fork_active_turn',
-                        'session.undo_unavailable',
-                        'session.export_not_found',
-                        'session.export_missing_version',
-                        'session.export_output_conflict',
-                        'session.export_too_large',
-                        'session.closed',
-                        'session.permission_mode_invalid',
-                        'session.thinking_empty',
-                        'session.model_empty',
-                        'session.plan_mode_invalid',
-                        'session.approval_handler_error',
-                        'session.question_handler_error',
-                        'session.init_failed',
-                        'agent.not_found',
-                        'agent.already_exists',
-                        'agent.already_running',
-                        'agent.not_a_subagent',
-                        'agent.not_owned',
-                        'agent.type_not_allowed',
-                        'agent.max_tokens_exceeded',
-                        'activity.agent_busy',
-                        'activity.cancelling',
-                        'activity.disposing',
-                        'activity.disposed',
-                        'activity.initializing',
-                        'activity.session_rejected',
-                        'turn.agent_busy',
-                        'goal.already_exists',
-                        'goal.not_found',
-                        'goal.objective_empty',
-                        'goal.objective_too_long',
-                        'goal.status_invalid',
-                        'goal.metadata_reserved',
-                        'goal.not_resumable',
-                        'goal.unsupported_agent',
-                        'model.not_configured',
-                        'model.config_invalid',
-                        'profile.thinking_alias_conflict',
-                        'model.not_found',
-                        'auth.login_required',
-                        'auth.provisioning_required',
-                        'auth.token_missing',
-                        'auth.token_unauthorized',
-                        'auth.model_not_resolved',
-                        'context.overflow',
-                        'loop.max_steps_exceeded',
-                        'provider.api_error',
-                        'provider.filtered',
-                        'provider.rate_limit',
-                        'provider.auth_error',
-                        'provider.connection_error',
-                        'provider.overloaded',
-                        'provider.not_found',
-                        'skill.not_found',
-                        'skill.type_unsupported',
-                        'skill.name_empty',
-                        'skill.parse_failed',
-                        'skill.nested_too_deep',
-                        'records.write_failed',
-                        'compaction.failed',
-                        'compaction.unable',
-                        'task.task_id_empty',
-                        'task.limit_exceeded',
-                        'usage.turn_id_conflict',
-                        'mcp.server_not_found',
-                        'mcp.server_disabled',
-                        'mcp.startup_failed',
-                        'mcp.tool_name_collision',
-                        'mcp.oauth_failed',
-                        'message.not_found',
-                        'plugin.not_found',
-                        'plugin.load_failed',
-                        'request.invalid',
-                        'request.work_dir_required',
-                        'request.prompt_input_empty',
-                        'prompt.id_conflict',
-                        'prompt.not_found',
-                        'prompt.already_completed',
-                        'session.busy',
-                        'shell.git_bash_not_found',
-                        'workspace.not_found',
-                        'terminal.not_found',
-                        'file.not_found',
-                        'file.too_large',
-                        'fs.path_not_found',
-                        'fs.permission_denied',
-                        'fs.path_escapes',
-                        'fs.is_directory',
-                        'fs.is_binary',
-                        'fs.too_large',
-                        'fs.already_exists',
-                        'fs.too_many_results',
-                        'fs.grep_timeout',
-                        'fs.git_unavailable',
-                        'wire.migration_missing',
-                        'storage.permission_denied',
-                        'storage.disk_full',
-                        'cron.expression_invalid',
-                        'web.invalid_url',
-                        'web.private_address',
-                        'web.fetch_failed',
-                        'validation.failed',
-                        'not_implemented',
-                        'internal',
-                      ],
-                      type: 'string',
-                    },
-                    details: {
-                      additionalProperties: {},
-                      propertyNames: {
+        event_created_at: {
+          type: 'string',
+        },
+        max_context_tokens: {
+          exclusiveMinimum: 0,
+          maximum: 9007199254740991,
+          type: 'integer',
+        },
+        session_id: {
+          minLength: 1,
+          type: 'string',
+        },
+        type: {
+          const: 'context',
+          type: 'string',
+        },
+      },
+      required: [
+        'context_tokens',
+        'type',
+        'session_id',
+        'agent_id',
+        'event_created_at',
+      ],
+      type: 'object',
+    },
+  },
+  {
+    name: 'goal',
+    title: 'Goal',
+    summary: 'Goal of the main agent, sent when a connection starts receiving it and on every change; goal is omitted when the session has none.',
+    direction: 'server_to_client',
+    payload: {
+      properties: {
+        agent_id: {
+          minLength: 1,
+          type: 'string',
+        },
+        event_created_at: {
+          type: 'string',
+        },
+        goal: {
+          properties: {
+            completion_criterion: {
+              type: 'string',
+            },
+            objective: {
+              type: 'string',
+            },
+            status: {
+              enum: [
+                'active',
+                'paused',
+                'blocked',
+                'complete',
+              ],
+              type: 'string',
+            },
+            tokens_used: {
+              maximum: 9007199254740991,
+              minimum: 0,
+              type: 'integer',
+            },
+            turns_used: {
+              maximum: 9007199254740991,
+              minimum: 0,
+              type: 'integer',
+            },
+            wall_clock_ms: {
+              minimum: 0,
+              type: 'number',
+            },
+          },
+          required: [
+            'objective',
+            'status',
+            'turns_used',
+            'tokens_used',
+            'wall_clock_ms',
+          ],
+          type: 'object',
+        },
+        session_id: {
+          minLength: 1,
+          type: 'string',
+        },
+        type: {
+          const: 'goal',
+          type: 'string',
+        },
+      },
+      required: [
+        'type',
+        'session_id',
+        'agent_id',
+        'event_created_at',
+      ],
+      type: 'object',
+    },
+  },
+  {
+    name: 'interaction',
+    title: 'Interaction',
+    summary: 'Flat, unsequenced approval or question state for a subscribed session; pending interactions are re-sent after every accepted subscription.',
+    direction: 'server_to_client',
+    payload: {
+      oneOf: [
+        {
+          properties: {
+            agent_id: {
+              minLength: 1,
+              type: 'string',
+            },
+            ended_at: {
+              type: 'string',
+            },
+            event_created_at: {
+              type: 'string',
+            },
+            interaction_id: {
+              minLength: 1,
+              type: 'string',
+            },
+            kind: {
+              const: 'approval',
+              type: 'string',
+            },
+            outcome: {
+              enum: [
+                'approved',
+                'rejected',
+                'cancelled',
+                'answered',
+                'dismissed',
+              ],
+              type: 'string',
+            },
+            request: {
+              properties: {
+                action: {
+                  type: 'string',
+                },
+                expires_at: {
+                  type: 'string',
+                },
+                tool_input_display: {},
+                tool_name: {
+                  minLength: 1,
+                  type: 'string',
+                },
+              },
+              required: [
+                'tool_name',
+                'action',
+                'expires_at',
+              ],
+              type: 'object',
+            },
+            response: {
+              properties: {
+                decision: {
+                  enum: [
+                    'approved',
+                    'rejected',
+                    'cancelled',
+                  ],
+                  type: 'string',
+                },
+                feedback: {
+                  type: 'string',
+                },
+                scope: {
+                  enum: [
+                    'session',
+                  ],
+                  type: 'string',
+                },
+                selected_label: {
+                  type: 'string',
+                },
+              },
+              required: [
+                'decision',
+              ],
+              type: 'object',
+            },
+            session_id: {
+              minLength: 1,
+              type: 'string',
+            },
+            status: {
+              enum: [
+                'pending',
+                'ended',
+              ],
+              type: 'string',
+            },
+            tool_call_id: {
+              minLength: 1,
+              type: 'string',
+            },
+            type: {
+              const: 'interaction',
+              type: 'string',
+            },
+          },
+          required: [
+            'type',
+            'session_id',
+            'agent_id',
+            'event_created_at',
+            'interaction_id',
+            'status',
+            'kind',
+            'request',
+          ],
+          type: 'object',
+        },
+        {
+          properties: {
+            agent_id: {
+              minLength: 1,
+              type: 'string',
+            },
+            ended_at: {
+              type: 'string',
+            },
+            event_created_at: {
+              type: 'string',
+            },
+            interaction_id: {
+              minLength: 1,
+              type: 'string',
+            },
+            kind: {
+              const: 'question',
+              type: 'string',
+            },
+            outcome: {
+              enum: [
+                'approved',
+                'rejected',
+                'cancelled',
+                'answered',
+                'dismissed',
+              ],
+              type: 'string',
+            },
+            request: {
+              properties: {
+                questions: {
+                  items: {
+                    properties: {
+                      allow_other: {
+                        type: 'boolean',
+                      },
+                      body: {
                         type: 'string',
                       },
+                      header: {
+                        type: 'string',
+                      },
+                      id: {
+                        minLength: 1,
+                        type: 'string',
+                      },
+                      multi_select: {
+                        type: 'boolean',
+                      },
+                      options: {
+                        items: {
+                          properties: {
+                            description: {
+                              type: 'string',
+                            },
+                            id: {
+                              minLength: 1,
+                              type: 'string',
+                            },
+                            label: {
+                              minLength: 1,
+                              type: 'string',
+                            },
+                          },
+                          required: [
+                            'id',
+                            'label',
+                          ],
+                          type: 'object',
+                        },
+                        maxItems: 4,
+                        minItems: 2,
+                        type: 'array',
+                      },
+                      other_description: {
+                        type: 'string',
+                      },
+                      other_label: {
+                        type: 'string',
+                      },
+                      question: {
+                        minLength: 1,
+                        type: 'string',
+                      },
+                    },
+                    required: [
+                      'id',
+                      'question',
+                      'options',
+                    ],
+                    type: 'object',
+                  },
+                  maxItems: 4,
+                  minItems: 1,
+                  type: 'array',
+                },
+              },
+              required: [
+                'questions',
+              ],
+              type: 'object',
+            },
+            response: {
+              properties: {
+                answers: {
+                  additionalProperties: {
+                    anyOf: [
+                      {
+                        type: 'string',
+                      },
+                      {
+                        const: true,
+                        type: 'boolean',
+                      },
+                    ],
+                  },
+                  propertyNames: {
+                    type: 'string',
+                  },
+                  type: 'object',
+                },
+                method: {
+                  enum: [
+                    'enter',
+                    'space',
+                    'number_key',
+                    'click',
+                  ],
+                  type: 'string',
+                },
+              },
+              required: [
+                'answers',
+              ],
+              type: 'object',
+            },
+            session_id: {
+              minLength: 1,
+              type: 'string',
+            },
+            status: {
+              enum: [
+                'pending',
+                'ended',
+              ],
+              type: 'string',
+            },
+            tool_call_id: {
+              minLength: 1,
+              type: 'string',
+            },
+            type: {
+              const: 'interaction',
+              type: 'string',
+            },
+          },
+          required: [
+            'type',
+            'session_id',
+            'agent_id',
+            'event_created_at',
+            'interaction_id',
+            'status',
+            'kind',
+            'request',
+          ],
+          type: 'object',
+        },
+      ],
+    },
+  },
+  {
+    name: 'item',
+    title: 'Item',
+    summary: 'item.started or item.ended with the full item; it replaces the client copy of the item with the same item_id. item.ended is sent once per item, again only for a later authoritative replacement.',
+    direction: 'server_to_client',
+    payload: {
+      properties: {
+        agent_id: {
+          minLength: 1,
+          type: 'string',
+        },
+        event_created_at: {
+          type: 'string',
+        },
+        item: {
+          anyOf: [
+            {
+              properties: {
+                attachments: {
+                  items: {
+                    properties: {
+                      file_id: {
+                        type: 'string',
+                      },
+                      kind: {
+                        enum: [
+                          'image',
+                          'video',
+                          'audio',
+                          'file',
+                        ],
+                        type: 'string',
+                      },
+                      media_type: {
+                        type: 'string',
+                      },
+                      name: {
+                        type: 'string',
+                      },
+                      ordinal: {
+                        exclusiveMinimum: 0,
+                        maximum: 9007199254740991,
+                        type: 'integer',
+                      },
+                      size: {
+                        maximum: 9007199254740991,
+                        minimum: 0,
+                        type: 'integer',
+                      },
+                      url: {
+                        type: 'string',
+                      },
+                    },
+                    required: [
+                      'kind',
+                      'ordinal',
+                    ],
+                    type: 'object',
+                  },
+                  type: 'array',
+                },
+                created_at: {
+                  type: 'string',
+                },
+                debug: {
+                  properties: {
+                    finish_reason: {
+                      type: 'string',
+                    },
+                    timing: {
+                      properties: {
+                        client_blocked_ms: {
+                          type: 'number',
+                        },
+                        client_consume_ms: {
+                          type: 'number',
+                        },
+                        first_token_ms: {
+                          type: 'number',
+                        },
+                        request_build_ms: {
+                          type: 'number',
+                        },
+                        server_decode_ms: {
+                          type: 'number',
+                        },
+                        server_first_token_ms: {
+                          type: 'number',
+                        },
+                        stream_ms: {
+                          type: 'number',
+                        },
+                      },
                       type: 'object',
-                    },
-                    message: {
-                      type: 'string',
-                    },
-                    name: {
-                      type: 'string',
-                    },
-                    retryable: {
-                      type: 'boolean',
-                    },
-                    type: {
-                      const: 'error',
-                      type: 'string',
-                    },
-                  },
-                  required: [
-                    'code',
-                    'message',
-                    'retryable',
-                    'type',
-                    'agentId',
-                  ],
-                  type: 'object',
-                },
-                {
-                  properties: {
-                    agentId: {
-                      type: 'string',
-                    },
-                    code: {
-                      type: 'string',
-                    },
-                    message: {
-                      type: 'string',
-                    },
-                    type: {
-                      const: 'warning',
-                      type: 'string',
-                    },
-                  },
-                  required: [
-                    'type',
-                    'agentId',
-                    'message',
-                  ],
-                  type: 'object',
-                },
-                {
-                  properties: {
-                    agentId: {
-                      type: 'string',
-                    },
-                    contextTokens: {
-                      type: 'number',
-                    },
-                    contextUsage: {
-                      type: 'number',
-                    },
-                    maxContextTokens: {
-                      type: 'number',
-                    },
-                    model: {
-                      type: 'string',
-                    },
-                    permission: {
-                      enum: [
-                        'manual',
-                        'yolo',
-                        'auto',
-                      ],
-                      type: 'string',
-                    },
-                    phase: {
-                      oneOf: [
-                        {
-                          properties: {
-                            kind: {
-                              const: 'idle',
-                              type: 'string',
-                            },
-                          },
-                          required: [
-                            'kind',
-                          ],
-                          type: 'object',
-                        },
-                        {
-                          properties: {
-                            kind: {
-                              const: 'running',
-                              type: 'string',
-                            },
-                            since: {
-                              type: 'number',
-                            },
-                            step: {
-                              type: 'number',
-                            },
-                            stepId: {
-                              type: 'string',
-                            },
-                            turnId: {
-                              type: 'number',
-                            },
-                          },
-                          required: [
-                            'kind',
-                            'turnId',
-                            'step',
-                            'stepId',
-                            'since',
-                          ],
-                          type: 'object',
-                        },
-                        {
-                          properties: {
-                            kind: {
-                              const: 'streaming',
-                              type: 'string',
-                            },
-                            since: {
-                              type: 'number',
-                            },
-                            step: {
-                              type: 'number',
-                            },
-                            stepId: {
-                              type: 'string',
-                            },
-                            stream: {
-                              enum: [
-                                'assistant',
-                                'thinking',
-                                'tool_call',
-                              ],
-                              type: 'string',
-                            },
-                            toolCallId: {
-                              type: 'string',
-                            },
-                            toolName: {
-                              type: 'string',
-                            },
-                            turnId: {
-                              type: 'number',
-                            },
-                          },
-                          required: [
-                            'kind',
-                            'turnId',
-                            'step',
-                            'stepId',
-                            'stream',
-                            'since',
-                          ],
-                          type: 'object',
-                        },
-                        {
-                          properties: {
-                            kind: {
-                              const: 'tool_call',
-                              type: 'string',
-                            },
-                            name: {
-                              type: 'string',
-                            },
-                            since: {
-                              type: 'number',
-                            },
-                            step: {
-                              type: 'number',
-                            },
-                            toolCallId: {
-                              type: 'string',
-                            },
-                            turnId: {
-                              type: 'number',
-                            },
-                          },
-                          required: [
-                            'kind',
-                            'turnId',
-                            'step',
-                            'toolCallId',
-                            'name',
-                            'since',
-                          ],
-                          type: 'object',
-                        },
-                        {
-                          properties: {
-                            delayMs: {
-                              type: 'number',
-                            },
-                            errorName: {
-                              type: 'string',
-                            },
-                            failedAttempt: {
-                              type: 'number',
-                            },
-                            kind: {
-                              const: 'retrying',
-                              type: 'string',
-                            },
-                            maxAttempts: {
-                              type: 'number',
-                            },
-                            nextAttempt: {
-                              type: 'number',
-                            },
-                            since: {
-                              type: 'number',
-                            },
-                            statusCode: {
-                              type: 'number',
-                            },
-                            step: {
-                              type: 'number',
-                            },
-                            stepId: {
-                              type: 'string',
-                            },
-                            turnId: {
-                              type: 'number',
-                            },
-                          },
-                          required: [
-                            'kind',
-                            'turnId',
-                            'step',
-                            'stepId',
-                            'failedAttempt',
-                            'nextAttempt',
-                            'maxAttempts',
-                            'delayMs',
-                            'since',
-                          ],
-                          type: 'object',
-                        },
-                        {
-                          properties: {
-                            approval: {},
-                            kind: {
-                              const: 'awaiting_approval',
-                              type: 'string',
-                            },
-                            since: {
-                              type: 'number',
-                            },
-                            step: {
-                              type: 'number',
-                            },
-                            turnId: {
-                              type: 'number',
-                            },
-                          },
-                          required: [
-                            'kind',
-                            'turnId',
-                            'since',
-                          ],
-                          type: 'object',
-                        },
-                        {
-                          properties: {
-                            at: {
-                              type: 'number',
-                            },
-                            kind: {
-                              const: 'interrupted',
-                              type: 'string',
-                            },
-                            message: {
-                              type: 'string',
-                            },
-                            reason: {
-                              enum: [
-                                'aborted',
-                                'max_steps',
-                                'error',
-                              ],
-                              type: 'string',
-                            },
-                            step: {
-                              type: 'number',
-                            },
-                            turnId: {
-                              type: 'number',
-                            },
-                          },
-                          required: [
-                            'kind',
-                            'turnId',
-                            'reason',
-                            'at',
-                          ],
-                          type: 'object',
-                        },
-                        {
-                          properties: {
-                            at: {
-                              type: 'number',
-                            },
-                            durationMs: {
-                              type: 'number',
-                            },
-                            kind: {
-                              const: 'ended',
-                              type: 'string',
-                            },
-                            reason: {
-                              enum: [
-                                'completed',
-                                'cancelled',
-                                'failed',
-                                'blocked',
-                              ],
-                              type: 'string',
-                            },
-                            turnId: {
-                              type: 'number',
-                            },
-                          },
-                          required: [
-                            'kind',
-                            'turnId',
-                            'reason',
-                            'at',
-                          ],
-                          type: 'object',
-                        },
-                      ],
-                    },
-                    planMode: {
-                      type: 'boolean',
-                    },
-                    swarmMode: {
-                      type: 'boolean',
-                    },
-                    thinkingEffort: {
-                      type: 'string',
-                    },
-                    towerMode: {
-                      type: 'boolean',
-                    },
-                    type: {
-                      const: 'agent.status.updated',
-                      type: 'string',
                     },
                     usage: {
                       properties: {
-                        byModel: {
-                          additionalProperties: {
-                            properties: {
-                              inputCacheCreation: {
-                                type: 'number',
-                              },
-                              inputCacheRead: {
-                                type: 'number',
-                              },
-                              inputOther: {
-                                type: 'number',
-                              },
-                              output: {
-                                type: 'number',
-                              },
-                            },
-                            required: [
-                              'inputOther',
-                              'output',
-                              'inputCacheRead',
-                              'inputCacheCreation',
-                            ],
-                            type: 'object',
-                          },
-                          propertyNames: {
-                            type: 'string',
-                          },
-                          type: 'object',
-                        },
-                        currentTurn: {
-                          properties: {
-                            inputCacheCreation: {
-                              type: 'number',
-                            },
-                            inputCacheRead: {
-                              type: 'number',
-                            },
-                            inputOther: {
-                              type: 'number',
-                            },
-                            output: {
-                              type: 'number',
-                            },
-                          },
-                          required: [
-                            'inputOther',
-                            'output',
-                            'inputCacheRead',
-                            'inputCacheCreation',
-                          ],
-                          type: 'object',
-                        },
-                        total: {
-                          properties: {
-                            inputCacheCreation: {
-                              type: 'number',
-                            },
-                            inputCacheRead: {
-                              type: 'number',
-                            },
-                            inputOther: {
-                              type: 'number',
-                            },
-                            output: {
-                              type: 'number',
-                            },
-                          },
-                          required: [
-                            'inputOther',
-                            'output',
-                            'inputCacheRead',
-                            'inputCacheCreation',
-                          ],
-                          type: 'object',
-                        },
-                      },
-                      type: 'object',
-                    },
-                  },
-                  required: [
-                    'type',
-                    'agentId',
-                  ],
-                  type: 'object',
-                },
-                {
-                  properties: {
-                    type: {
-                      const: 'agent.created',
-                      type: 'string',
-                    },
-                  },
-                  required: [
-                    'type',
-                  ],
-                  type: 'object',
-                },
-                {
-                  properties: {
-                    type: {
-                      const: 'agent.disposed',
-                      type: 'string',
-                    },
-                  },
-                  required: [
-                    'type',
-                  ],
-                  type: 'object',
-                },
-                {
-                  properties: {
-                    patch: {
-                      additionalProperties: {},
-                      propertyNames: {
-                        type: 'string',
-                      },
-                      type: 'object',
-                    },
-                    title: {
-                      type: 'string',
-                    },
-                    type: {
-                      const: 'session.meta.updated',
-                      type: 'string',
-                    },
-                  },
-                  required: [
-                    'type',
-                  ],
-                  type: 'object',
-                },
-                {
-                  properties: {
-                    session: {
-                      properties: {
-                        agent_config: {
-                          properties: {
-                            goal_control: {
-                              enum: [
-                                'pause',
-                                'resume',
-                                'cancel',
-                              ],
-                              type: 'string',
-                            },
-                            goal_objective: {
-                              type: 'string',
-                            },
-                            mcp_servers: {
-                              items: {
-                                type: 'string',
-                              },
-                              type: 'array',
-                            },
-                            model: {
-                              type: 'string',
-                            },
-                            permission_mode: {
-                              enum: [
-                                'manual',
-                                'yolo',
-                                'auto',
-                              ],
-                              type: 'string',
-                            },
-                            plan_mode: {
-                              type: 'boolean',
-                            },
-                            swarm_mode: {
-                              type: 'boolean',
-                            },
-                            system_prompt: {
-                              type: 'string',
-                            },
-                            thinking: {
-                              minLength: 1,
-                              type: 'string',
-                            },
-                            tools: {
-                              items: {
-                                type: 'string',
-                              },
-                              type: 'array',
-                            },
-                            tower_base: {
-                              minLength: 1,
-                              type: 'string',
-                            },
-                            tower_mode: {
-                              type: 'boolean',
-                            },
-                          },
-                          required: [
-                            'model',
-                          ],
-                          type: 'object',
-                        },
-                        archived: {
-                          type: 'boolean',
-                        },
-                        archived_at: {
-                          type: 'string',
-                        },
-                        busy: {
-                          type: 'boolean',
-                        },
-                        created_at: {
-                          type: 'string',
-                        },
-                        current_prompt_id: {
-                          minLength: 1,
-                          type: 'string',
-                        },
-                        id: {
-                          minLength: 1,
-                          type: 'string',
-                        },
-                        last_prompt: {
-                          type: 'string',
-                        },
-                        last_seq: {
-                          maximum: 9007199254740991,
+                        input_cache_creation: {
                           minimum: 0,
-                          type: 'integer',
-                        },
-                        last_turn_reason: {
-                          enum: [
-                            'completed',
-                            'cancelled',
-                            'failed',
-                          ],
-                          type: 'string',
-                        },
-                        main_turn_active: {
-                          type: 'boolean',
-                        },
-                        message_count: {
-                          maximum: 9007199254740991,
-                          minimum: 0,
-                          type: 'integer',
-                        },
-                        metadata: {
-                          additionalProperties: {},
-                          properties: {
-                            cwd: {
-                              minLength: 1,
-                              type: 'string',
-                            },
-                          },
-                          required: [
-                            'cwd',
-                          ],
-                          type: 'object',
-                        },
-                        pending_interaction: {
-                          enum: [
-                            'none',
-                            'approval',
-                            'question',
-                          ],
-                          type: 'string',
-                        },
-                        permission_rules: {
-                          items: {
-                            properties: {
-                              created_at: {
-                                type: 'string',
-                              },
-                              created_by: {
-                                enum: [
-                                  'user',
-                                  'agent',
-                                ],
-                                type: 'string',
-                              },
-                              decision: {
-                                const: 'approved',
-                                type: 'string',
-                              },
-                              id: {
-                                minLength: 1,
-                                type: 'string',
-                              },
-                              matcher: {
-                                properties: {
-                                  kind: {
-                                    enum: [
-                                      'command_prefix',
-                                      'path_glob',
-                                      'exact_input',
-                                      'always',
-                                    ],
-                                    type: 'string',
-                                  },
-                                  value: {
-                                    type: 'string',
-                                  },
-                                },
-                                required: [
-                                  'kind',
-                                ],
-                                type: 'object',
-                              },
-                              tool_name: {
-                                minLength: 1,
-                                type: 'string',
-                              },
-                            },
-                            required: [
-                              'id',
-                              'tool_name',
-                              'decision',
-                              'created_at',
-                              'created_by',
-                            ],
-                            type: 'object',
-                          },
-                          type: 'array',
-                        },
-                        title: {
-                          type: 'string',
-                        },
-                        updated_at: {
-                          type: 'string',
-                        },
-                        usage: {
-                          properties: {
-                            cache_creation_tokens: {
-                              maximum: 9007199254740991,
-                              minimum: 0,
-                              type: 'integer',
-                            },
-                            cache_read_tokens: {
-                              maximum: 9007199254740991,
-                              minimum: 0,
-                              type: 'integer',
-                            },
-                            context_limit: {
-                              maximum: 9007199254740991,
-                              minimum: 0,
-                              type: 'integer',
-                            },
-                            context_tokens: {
-                              maximum: 9007199254740991,
-                              minimum: 0,
-                              type: 'integer',
-                            },
-                            input_tokens: {
-                              maximum: 9007199254740991,
-                              minimum: 0,
-                              type: 'integer',
-                            },
-                            output_tokens: {
-                              maximum: 9007199254740991,
-                              minimum: 0,
-                              type: 'integer',
-                            },
-                            total_cost_usd: {
-                              minimum: 0,
-                              type: 'number',
-                            },
-                            turn_count: {
-                              maximum: 9007199254740991,
-                              minimum: 0,
-                              type: 'integer',
-                            },
-                          },
-                          required: [
-                            'input_tokens',
-                            'output_tokens',
-                            'cache_read_tokens',
-                            'cache_creation_tokens',
-                            'context_tokens',
-                          ],
-                          type: 'object',
-                        },
-                        workspace_id: {
-                          pattern: '^wd_[a-z0-9._-]+_[0-9a-f]{12}$',
-                          type: 'string',
-                        },
-                      },
-                      required: [
-                        'id',
-                        'workspace_id',
-                        'title',
-                        'created_at',
-                        'updated_at',
-                        'busy',
-                        'metadata',
-                        'agent_config',
-                        'usage',
-                        'permission_rules',
-                        'message_count',
-                        'last_seq',
-                      ],
-                      type: 'object',
-                    },
-                    type: {
-                      const: 'event.session.created',
-                      type: 'string',
-                    },
-                  },
-                  required: [
-                    'type',
-                    'session',
-                  ],
-                  type: 'object',
-                },
-                {
-                  properties: {
-                    type: {
-                      const: 'event.session.archived',
-                      type: 'string',
-                    },
-                    workspace_id: {
-                      minLength: 1,
-                      type: 'string',
-                    },
-                  },
-                  required: [
-                    'type',
-                    'workspace_id',
-                  ],
-                  type: 'object',
-                },
-                {
-                  properties: {
-                    type: {
-                      const: 'event.workspace.created',
-                      type: 'string',
-                    },
-                    workspace: {
-                      properties: {
-                        created_at: {
-                          type: 'string',
-                        },
-                        id: {
-                          pattern: '^wd_[a-z0-9._-]+_[0-9a-f]{12}$',
-                          type: 'string',
-                        },
-                        last_opened_at: {
-                          type: 'string',
-                        },
-                        name: {
-                          maxLength: 100,
-                          minLength: 1,
-                          type: 'string',
-                        },
-                        root: {
-                          minLength: 1,
-                          type: 'string',
-                        },
-                        session_count: {
-                          maximum: 9007199254740991,
-                          minimum: 0,
-                          type: 'integer',
-                        },
-                      },
-                      required: [
-                        'id',
-                        'root',
-                        'name',
-                        'created_at',
-                        'last_opened_at',
-                        'session_count',
-                      ],
-                      type: 'object',
-                    },
-                  },
-                  required: [
-                    'type',
-                    'workspace',
-                  ],
-                  type: 'object',
-                },
-                {
-                  properties: {
-                    type: {
-                      const: 'event.workspace.updated',
-                      type: 'string',
-                    },
-                    workspace: {
-                      properties: {
-                        created_at: {
-                          type: 'string',
-                        },
-                        id: {
-                          pattern: '^wd_[a-z0-9._-]+_[0-9a-f]{12}$',
-                          type: 'string',
-                        },
-                        last_opened_at: {
-                          type: 'string',
-                        },
-                        name: {
-                          maxLength: 100,
-                          minLength: 1,
-                          type: 'string',
-                        },
-                        root: {
-                          minLength: 1,
-                          type: 'string',
-                        },
-                        session_count: {
-                          maximum: 9007199254740991,
-                          minimum: 0,
-                          type: 'integer',
-                        },
-                      },
-                      required: [
-                        'id',
-                        'root',
-                        'name',
-                        'created_at',
-                        'last_opened_at',
-                        'session_count',
-                      ],
-                      type: 'object',
-                    },
-                  },
-                  required: [
-                    'type',
-                    'workspace',
-                  ],
-                  type: 'object',
-                },
-                {
-                  properties: {
-                    root: {
-                      minLength: 1,
-                      type: 'string',
-                    },
-                    type: {
-                      const: 'event.workspace.deleted',
-                      type: 'string',
-                    },
-                    workspace_id: {
-                      minLength: 1,
-                      type: 'string',
-                    },
-                  },
-                  required: [
-                    'type',
-                    'workspace_id',
-                    'root',
-                  ],
-                  type: 'object',
-                },
-                {
-                  properties: {
-                    busy: {
-                      type: 'boolean',
-                    },
-                    last_turn_reason: {
-                      enum: [
-                        'completed',
-                        'cancelled',
-                        'failed',
-                      ],
-                      type: 'string',
-                    },
-                    main_turn_active: {
-                      type: 'boolean',
-                    },
-                    pending_interaction: {
-                      enum: [
-                        'none',
-                        'approval',
-                        'question',
-                      ],
-                      type: 'string',
-                    },
-                    type: {
-                      const: 'event.session.work_changed',
-                      type: 'string',
-                    },
-                  },
-                  required: [
-                    'type',
-                    'busy',
-                  ],
-                  type: 'object',
-                },
-                {
-                  properties: {
-                    current_prompt_id: {
-                      minLength: 1,
-                      type: 'string',
-                    },
-                    previous_status: {
-                      enum: [
-                        'idle',
-                        'running',
-                        'awaiting_approval',
-                        'awaiting_question',
-                        'aborted',
-                      ],
-                      type: 'string',
-                    },
-                    status: {
-                      enum: [
-                        'idle',
-                        'running',
-                        'awaiting_approval',
-                        'awaiting_question',
-                        'aborted',
-                      ],
-                      type: 'string',
-                    },
-                    type: {
-                      const: 'event.session.status_changed',
-                      type: 'string',
-                    },
-                  },
-                  required: [
-                    'type',
-                    'status',
-                    'previous_status',
-                  ],
-                  type: 'object',
-                },
-                {
-                  properties: {
-                    changedFields: {
-                      items: {
-                        minLength: 1,
-                        type: 'string',
-                      },
-                      type: 'array',
-                    },
-                    config: {
-                      additionalProperties: {},
-                      properties: {
-                        background: {},
-                        default_model: {
-                          type: 'string',
-                        },
-                        default_permission_mode: {
-                          type: 'string',
-                        },
-                        default_plan_mode: {
-                          type: 'boolean',
-                        },
-                        default_provider: {
-                          type: 'string',
-                        },
-                        experimental: {
-                          additionalProperties: {
-                            type: 'boolean',
-                          },
-                          propertyNames: {
-                            type: 'string',
-                          },
-                          type: 'object',
-                        },
-                        extra_skill_dirs: {
-                          items: {
-                            type: 'string',
-                          },
-                          type: 'array',
-                        },
-                        hooks: {
-                          items: {},
-                          type: 'array',
-                        },
-                        loop_control: {},
-                        merge_all_available_skills: {
-                          type: 'boolean',
-                        },
-                        models: {
-                          additionalProperties: {},
-                          propertyNames: {
-                            type: 'string',
-                          },
-                          type: 'object',
-                        },
-                        permission: {},
-                        plan_mode: {
-                          type: 'boolean',
-                        },
-                        providers: {
-                          additionalProperties: {
-                            properties: {
-                              base_url: {
-                                type: 'string',
-                              },
-                              default_model: {
-                                type: 'string',
-                              },
-                              has_api_key: {
-                                type: 'boolean',
-                              },
-                              type: {
-                                type: 'string',
-                              },
-                            },
-                            required: [
-                              'type',
-                              'has_api_key',
-                            ],
-                            type: 'object',
-                          },
-                          default: {},
-                          propertyNames: {
-                            type: 'string',
-                          },
-                          type: 'object',
-                        },
-                        raw: {
-                          additionalProperties: {},
-                          propertyNames: {
-                            type: 'string',
-                          },
-                          type: 'object',
-                        },
-                        secondary_model: {},
-                        services: {},
-                        subagent: {},
-                        telemetry: {
-                          type: 'boolean',
-                        },
-                        thinking: {},
-                        yolo: {
-                          type: 'boolean',
-                        },
-                      },
-                      type: 'object',
-                    },
-                    type: {
-                      const: 'event.config.changed',
-                      type: 'string',
-                    },
-                  },
-                  required: [
-                    'type',
-                    'changedFields',
-                    'config',
-                  ],
-                  type: 'object',
-                },
-                {
-                  properties: {
-                    type: {
-                      const: 'event.config.warning',
-                      type: 'string',
-                    },
-                    warnings: {
-                      items: {
-                        properties: {
-                          domain: {
-                            type: 'string',
-                          },
-                          message: {
-                            type: 'string',
-                          },
-                        },
-                        required: [
-                          'message',
-                        ],
-                        type: 'object',
-                      },
-                      type: 'array',
-                    },
-                  },
-                  required: [
-                    'type',
-                    'warnings',
-                  ],
-                  type: 'object',
-                },
-                {
-                  properties: {
-                    changed: {
-                      items: {
-                        properties: {
-                          added: {
-                            maximum: 9007199254740991,
-                            minimum: 0,
-                            type: 'integer',
-                          },
-                          provider_id: {
-                            minLength: 1,
-                            type: 'string',
-                          },
-                          provider_name: {
-                            minLength: 1,
-                            type: 'string',
-                          },
-                          removed: {
-                            maximum: 9007199254740991,
-                            minimum: 0,
-                            type: 'integer',
-                          },
-                        },
-                        required: [
-                          'provider_id',
-                          'provider_name',
-                          'added',
-                          'removed',
-                        ],
-                        type: 'object',
-                      },
-                      type: 'array',
-                    },
-                    failed: {
-                      items: {
-                        properties: {
-                          provider: {
-                            minLength: 1,
-                            type: 'string',
-                          },
-                          reason: {
-                            minLength: 1,
-                            type: 'string',
-                          },
-                        },
-                        required: [
-                          'provider',
-                          'reason',
-                        ],
-                        type: 'object',
-                      },
-                      type: 'array',
-                    },
-                    type: {
-                      const: 'event.model_catalog.changed',
-                      type: 'string',
-                    },
-                    unchanged: {
-                      items: {
-                        minLength: 1,
-                        type: 'string',
-                      },
-                      type: 'array',
-                    },
-                  },
-                  required: [
-                    'type',
-                    'changed',
-                    'unchanged',
-                    'failed',
-                  ],
-                  type: 'object',
-                },
-                {
-                  properties: {
-                    error: {
-                      type: 'string',
-                    },
-                    scope: {
-                      minLength: 1,
-                      type: 'string',
-                    },
-                    state: {
-                      enum: [
-                        'Pending',
-                        'Activating',
-                        'Active',
-                        'Unloading',
-                        'Failed',
-                      ],
-                      type: 'string',
-                    },
-                    token: {
-                      minLength: 1,
-                      type: 'string',
-                    },
-                    type: {
-                      const: 'event.di.unit_changed',
-                      type: 'string',
-                    },
-                  },
-                  required: [
-                    'type',
-                    'scope',
-                    'token',
-                    'state',
-                  ],
-                  type: 'object',
-                },
-                {
-                  properties: {
-                    type: {
-                      const: 'event.plugin.changed',
-                      type: 'string',
-                    },
-                  },
-                  required: [
-                    'type',
-                  ],
-                  type: 'object',
-                },
-                {
-                  properties: {
-                    capability_id: {
-                      type: 'string',
-                    },
-                    install: {
-                      properties: {
-                        error: {
-                          type: 'string',
-                        },
-                        note: {
-                          type: 'string',
-                        },
-                        percent: {
                           type: 'number',
                         },
-                        running: {
-                          type: 'boolean',
+                        input_cache_read: {
+                          minimum: 0,
+                          type: 'number',
                         },
-                        step: {
-                          type: 'string',
+                        input_other: {
+                          minimum: 0,
+                          type: 'number',
+                        },
+                        output: {
+                          minimum: 0,
+                          type: 'number',
                         },
                       },
                       required: [
-                        'running',
+                        'input_other',
+                        'output',
+                        'input_cache_read',
+                        'input_cache_creation',
                       ],
                       type: 'object',
                     },
-                    type: {
-                      const: 'event.capability.changed',
-                      type: 'string',
-                    },
                   },
-                  required: [
-                    'type',
-                    'capability_id',
-                    'install',
-                  ],
                   type: 'object',
                 },
-                {
-                  properties: {
-                    agentId: {
-                      type: 'string',
-                    },
-                    change: {
+                item_id: {
+                  minLength: 1,
+                  type: 'string',
+                },
+                metadata: {
+                  additionalProperties: {},
+                  propertyNames: {
+                    type: 'string',
+                  },
+                  type: 'object',
+                },
+                origin: {
+                  oneOf: [
+                    {
                       properties: {
-                        actor: {
-                          enum: [
-                            'user',
-                            'model',
-                            'runtime',
-                            'system',
-                          ],
-                          type: 'string',
-                        },
                         kind: {
-                          enum: [
-                            'lifecycle',
-                            'completion',
-                          ],
-                          type: 'string',
-                        },
-                        reason: {
-                          type: 'string',
-                        },
-                        stats: {
-                          properties: {
-                            tokensUsed: {
-                              type: 'number',
-                            },
-                            turnsUsed: {
-                              type: 'number',
-                            },
-                            wallClockMs: {
-                              type: 'number',
-                            },
-                          },
-                          required: [
-                            'turnsUsed',
-                            'tokensUsed',
-                            'wallClockMs',
-                          ],
-                          type: 'object',
-                        },
-                        status: {
-                          enum: [
-                            'active',
-                            'paused',
-                            'blocked',
-                            'complete',
-                          ],
+                          const: 'user',
                           type: 'string',
                         },
                       },
@@ -2125,600 +640,3926 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                       ],
                       type: 'object',
                     },
-                    snapshot: {
-                      anyOf: [
-                        {
+                    {
+                      properties: {
+                        args: {
+                          type: 'string',
+                        },
+                        kind: {
+                          const: 'skill',
+                          type: 'string',
+                        },
+                        name: {
+                          type: 'string',
+                        },
+                        path: {
+                          type: 'string',
+                        },
+                      },
+                      required: [
+                        'kind',
+                        'name',
+                      ],
+                      type: 'object',
+                    },
+                    {
+                      properties: {
+                        args: {
+                          type: 'string',
+                        },
+                        command: {
+                          type: 'string',
+                        },
+                        kind: {
+                          const: 'plugin_command',
+                          type: 'string',
+                        },
+                        plugin_id: {
+                          type: 'string',
+                        },
+                      },
+                      required: [
+                        'kind',
+                        'plugin_id',
+                        'command',
+                      ],
+                      type: 'object',
+                    },
+                    {
+                      properties: {
+                        coalesced_count: {
+                          maximum: 9007199254740991,
+                          minimum: 0,
+                          type: 'integer',
+                        },
+                        job_id: {
+                          type: 'string',
+                        },
+                        kind: {
+                          const: 'cron',
+                          type: 'string',
+                        },
+                        recurring: {
+                          type: 'boolean',
+                        },
+                        schedule: {
+                          type: 'string',
+                        },
+                        stale: {
+                          type: 'boolean',
+                        },
+                      },
+                      required: [
+                        'kind',
+                        'job_id',
+                        'schedule',
+                        'recurring',
+                        'coalesced_count',
+                        'stale',
+                      ],
+                      type: 'object',
+                    },
+                    {
+                      properties: {
+                        hook_event: {
+                          type: 'string',
+                        },
+                        kind: {
+                          const: 'hook',
+                          type: 'string',
+                        },
+                      },
+                      required: [
+                        'kind',
+                        'hook_event',
+                      ],
+                      type: 'object',
+                    },
+                    {
+                      properties: {
+                        kind: {
+                          const: 'goal',
+                          type: 'string',
+                        },
+                      },
+                      required: [
+                        'kind',
+                      ],
+                      type: 'object',
+                    },
+                    {
+                      properties: {
+                        kind: {
+                          const: 'retry',
+                          type: 'string',
+                        },
+                      },
+                      required: [
+                        'kind',
+                      ],
+                      type: 'object',
+                    },
+                    {
+                      properties: {
+                        kind: {
+                          const: 'system',
+                          type: 'string',
+                        },
+                      },
+                      required: [
+                        'kind',
+                      ],
+                      type: 'object',
+                    },
+                  ],
+                },
+                outcome: {
+                  enum: [
+                    'completed',
+                    'interrupted',
+                    'failed',
+                  ],
+                  type: 'string',
+                },
+                placement: {
+                  enum: [
+                    'opener',
+                    'steer',
+                  ],
+                  type: 'string',
+                },
+                prompt_ids: {
+                  items: {
+                    minLength: 1,
+                    type: 'string',
+                  },
+                  type: 'array',
+                },
+                skills: {
+                  items: {
+                    properties: {
+                      args: {
+                        type: 'string',
+                      },
+                      name: {
+                        type: 'string',
+                      },
+                      path: {
+                        type: 'string',
+                      },
+                    },
+                    required: [
+                      'name',
+                    ],
+                    type: 'object',
+                  },
+                  type: 'array',
+                },
+                status: {
+                  enum: [
+                    'running',
+                    'ended',
+                  ],
+                  type: 'string',
+                },
+                step_index: {
+                  exclusiveMinimum: 0,
+                  maximum: 9007199254740991,
+                  type: 'integer',
+                },
+                text: {
+                  type: 'string',
+                },
+                type: {
+                  const: 'user_message',
+                  type: 'string',
+                },
+              },
+              required: [
+                'type',
+                'item_id',
+                'status',
+                'created_at',
+                'prompt_ids',
+                'placement',
+                'origin',
+                'text',
+                'attachments',
+                'skills',
+              ],
+              type: 'object',
+            },
+            {
+              properties: {
+                created_at: {
+                  type: 'string',
+                },
+                debug: {
+                  properties: {
+                    finish_reason: {
+                      type: 'string',
+                    },
+                    timing: {
+                      properties: {
+                        client_blocked_ms: {
+                          type: 'number',
+                        },
+                        client_consume_ms: {
+                          type: 'number',
+                        },
+                        first_token_ms: {
+                          type: 'number',
+                        },
+                        request_build_ms: {
+                          type: 'number',
+                        },
+                        server_decode_ms: {
+                          type: 'number',
+                        },
+                        server_first_token_ms: {
+                          type: 'number',
+                        },
+                        stream_ms: {
+                          type: 'number',
+                        },
+                      },
+                      type: 'object',
+                    },
+                    usage: {
+                      properties: {
+                        input_cache_creation: {
+                          minimum: 0,
+                          type: 'number',
+                        },
+                        input_cache_read: {
+                          minimum: 0,
+                          type: 'number',
+                        },
+                        input_other: {
+                          minimum: 0,
+                          type: 'number',
+                        },
+                        output: {
+                          minimum: 0,
+                          type: 'number',
+                        },
+                      },
+                      required: [
+                        'input_other',
+                        'output',
+                        'input_cache_read',
+                        'input_cache_creation',
+                      ],
+                      type: 'object',
+                    },
+                  },
+                  type: 'object',
+                },
+                item_id: {
+                  minLength: 1,
+                  type: 'string',
+                },
+                outcome: {
+                  enum: [
+                    'completed',
+                    'interrupted',
+                    'failed',
+                  ],
+                  type: 'string',
+                },
+                status: {
+                  enum: [
+                    'running',
+                    'ended',
+                  ],
+                  type: 'string',
+                },
+                step_index: {
+                  exclusiveMinimum: 0,
+                  maximum: 9007199254740991,
+                  type: 'integer',
+                },
+                text: {
+                  type: 'string',
+                },
+                type: {
+                  const: 'assistant_message',
+                  type: 'string',
+                },
+              },
+              required: [
+                'type',
+                'item_id',
+                'status',
+                'created_at',
+                'text',
+              ],
+              type: 'object',
+            },
+            {
+              properties: {
+                created_at: {
+                  type: 'string',
+                },
+                debug: {
+                  properties: {
+                    finish_reason: {
+                      type: 'string',
+                    },
+                    timing: {
+                      properties: {
+                        client_blocked_ms: {
+                          type: 'number',
+                        },
+                        client_consume_ms: {
+                          type: 'number',
+                        },
+                        first_token_ms: {
+                          type: 'number',
+                        },
+                        request_build_ms: {
+                          type: 'number',
+                        },
+                        server_decode_ms: {
+                          type: 'number',
+                        },
+                        server_first_token_ms: {
+                          type: 'number',
+                        },
+                        stream_ms: {
+                          type: 'number',
+                        },
+                      },
+                      type: 'object',
+                    },
+                    usage: {
+                      properties: {
+                        input_cache_creation: {
+                          minimum: 0,
+                          type: 'number',
+                        },
+                        input_cache_read: {
+                          minimum: 0,
+                          type: 'number',
+                        },
+                        input_other: {
+                          minimum: 0,
+                          type: 'number',
+                        },
+                        output: {
+                          minimum: 0,
+                          type: 'number',
+                        },
+                      },
+                      required: [
+                        'input_other',
+                        'output',
+                        'input_cache_read',
+                        'input_cache_creation',
+                      ],
+                      type: 'object',
+                    },
+                  },
+                  type: 'object',
+                },
+                duration_ms: {
+                  maximum: 9007199254740991,
+                  minimum: 0,
+                  type: 'integer',
+                },
+                item_id: {
+                  minLength: 1,
+                  type: 'string',
+                },
+                outcome: {
+                  enum: [
+                    'completed',
+                    'interrupted',
+                    'failed',
+                  ],
+                  type: 'string',
+                },
+                started_at: {
+                  type: 'string',
+                },
+                status: {
+                  enum: [
+                    'running',
+                    'ended',
+                  ],
+                  type: 'string',
+                },
+                step_index: {
+                  exclusiveMinimum: 0,
+                  maximum: 9007199254740991,
+                  type: 'integer',
+                },
+                text: {
+                  type: 'string',
+                },
+                type: {
+                  const: 'reasoning',
+                  type: 'string',
+                },
+              },
+              required: [
+                'type',
+                'item_id',
+                'status',
+                'created_at',
+                'text',
+                'started_at',
+              ],
+              type: 'object',
+            },
+            {
+              properties: {
+                agent_refs: {
+                  items: {
+                    properties: {
+                      agent_id: {
+                        minLength: 1,
+                        type: 'string',
+                      },
+                      role: {
+                        enum: [
+                          'child',
+                          'member',
+                        ],
+                        type: 'string',
+                      },
+                      swarm_index: {
+                        maximum: 9007199254740991,
+                        minimum: 0,
+                        type: 'integer',
+                      },
+                      task_id: {
+                        type: 'string',
+                      },
+                    },
+                    required: [
+                      'agent_id',
+                      'role',
+                    ],
+                    type: 'object',
+                  },
+                  type: 'array',
+                },
+                created_at: {
+                  type: 'string',
+                },
+                debug: {
+                  properties: {
+                    finish_reason: {
+                      type: 'string',
+                    },
+                    timing: {
+                      properties: {
+                        client_blocked_ms: {
+                          type: 'number',
+                        },
+                        client_consume_ms: {
+                          type: 'number',
+                        },
+                        first_token_ms: {
+                          type: 'number',
+                        },
+                        request_build_ms: {
+                          type: 'number',
+                        },
+                        server_decode_ms: {
+                          type: 'number',
+                        },
+                        server_first_token_ms: {
+                          type: 'number',
+                        },
+                        stream_ms: {
+                          type: 'number',
+                        },
+                      },
+                      type: 'object',
+                    },
+                    usage: {
+                      properties: {
+                        input_cache_creation: {
+                          minimum: 0,
+                          type: 'number',
+                        },
+                        input_cache_read: {
+                          minimum: 0,
+                          type: 'number',
+                        },
+                        input_other: {
+                          minimum: 0,
+                          type: 'number',
+                        },
+                        output: {
+                          minimum: 0,
+                          type: 'number',
+                        },
+                      },
+                      required: [
+                        'input_other',
+                        'output',
+                        'input_cache_read',
+                        'input_cache_creation',
+                      ],
+                      type: 'object',
+                    },
+                  },
+                  type: 'object',
+                },
+                display: {},
+                ended_at: {
+                  type: 'string',
+                },
+                error: {
+                  type: 'string',
+                },
+                fields: {
+                  additionalProperties: {},
+                  propertyNames: {
+                    type: 'string',
+                  },
+                  type: 'object',
+                },
+                input: {},
+                input_text: {
+                  type: 'string',
+                },
+                interaction_id: {
+                  type: 'string',
+                },
+                item_id: {
+                  minLength: 1,
+                  type: 'string',
+                },
+                media: {
+                  items: {
+                    properties: {
+                      file_id: {
+                        type: 'string',
+                      },
+                      kind: {
+                        enum: [
+                          'image',
+                          'video',
+                          'audio',
+                        ],
+                        type: 'string',
+                      },
+                      media_type: {
+                        type: 'string',
+                      },
+                      url: {
+                        type: 'string',
+                      },
+                    },
+                    required: [
+                      'kind',
+                    ],
+                    type: 'object',
+                  },
+                  type: 'array',
+                },
+                name: {
+                  type: 'string',
+                },
+                note: {
+                  type: 'string',
+                },
+                outcome: {
+                  enum: [
+                    'completed',
+                    'interrupted',
+                    'failed',
+                  ],
+                  type: 'string',
+                },
+                output: {
+                  type: 'string',
+                },
+                stage: {
+                  enum: [
+                    'input',
+                    'awaiting_approval',
+                    'executing',
+                  ],
+                  type: 'string',
+                },
+                started_at: {
+                  type: 'string',
+                },
+                status: {
+                  enum: [
+                    'running',
+                    'ended',
+                  ],
+                  type: 'string',
+                },
+                step_index: {
+                  exclusiveMinimum: 0,
+                  maximum: 9007199254740991,
+                  type: 'integer',
+                },
+                task_id: {
+                  type: 'string',
+                },
+                type: {
+                  const: 'tool_call',
+                  type: 'string',
+                },
+              },
+              required: [
+                'type',
+                'item_id',
+                'status',
+                'created_at',
+                'name',
+                'started_at',
+              ],
+              type: 'object',
+            },
+            {
+              properties: {
+                agent_id: {
+                  type: 'string',
+                },
+                answer: {
+                  properties: {
+                    answers: {
+                      additionalProperties: {
+                        anyOf: [
+                          {
+                            type: 'string',
+                          },
+                          {
+                            const: true,
+                            type: 'boolean',
+                          },
+                        ],
+                      },
+                      propertyNames: {
+                        type: 'string',
+                      },
+                      type: 'object',
+                    },
+                    note: {
+                      type: 'string',
+                    },
+                  },
+                  required: [
+                    'answers',
+                  ],
+                  type: 'object',
+                },
+                body: {
+                  type: 'string',
+                },
+                created_at: {
+                  type: 'string',
+                },
+                debug: {
+                  properties: {
+                    finish_reason: {
+                      type: 'string',
+                    },
+                    timing: {
+                      properties: {
+                        client_blocked_ms: {
+                          type: 'number',
+                        },
+                        client_consume_ms: {
+                          type: 'number',
+                        },
+                        first_token_ms: {
+                          type: 'number',
+                        },
+                        request_build_ms: {
+                          type: 'number',
+                        },
+                        server_decode_ms: {
+                          type: 'number',
+                        },
+                        server_first_token_ms: {
+                          type: 'number',
+                        },
+                        stream_ms: {
+                          type: 'number',
+                        },
+                      },
+                      type: 'object',
+                    },
+                    usage: {
+                      properties: {
+                        input_cache_creation: {
+                          minimum: 0,
+                          type: 'number',
+                        },
+                        input_cache_read: {
+                          minimum: 0,
+                          type: 'number',
+                        },
+                        input_other: {
+                          minimum: 0,
+                          type: 'number',
+                        },
+                        output: {
+                          minimum: 0,
+                          type: 'number',
+                        },
+                      },
+                      required: [
+                        'input_other',
+                        'output',
+                        'input_cache_read',
+                        'input_cache_creation',
+                      ],
+                      type: 'object',
+                    },
+                  },
+                  type: 'object',
+                },
+                item_id: {
+                  minLength: 1,
+                  type: 'string',
+                },
+                notification_id: {
+                  type: 'string',
+                },
+                notification_type: {
+                  type: 'string',
+                },
+                outcome: {
+                  enum: [
+                    'completed',
+                    'interrupted',
+                    'failed',
+                  ],
+                  type: 'string',
+                },
+                output: {
+                  properties: {
+                    bytes: {
+                      maximum: 9007199254740991,
+                      minimum: 0,
+                      type: 'integer',
+                    },
+                    file: {
+                      type: 'string',
+                    },
+                    preview: {
+                      type: 'string',
+                    },
+                    truncated: {
+                      type: 'boolean',
+                    },
+                  },
+                  type: 'object',
+                },
+                severity: {
+                  enum: [
+                    'info',
+                    'warning',
+                    'error',
+                  ],
+                  type: 'string',
+                },
+                source: {
+                  properties: {
+                    id: {
+                      type: 'string',
+                    },
+                    kind: {
+                      type: 'string',
+                    },
+                  },
+                  required: [
+                    'kind',
+                    'id',
+                  ],
+                  type: 'object',
+                },
+                status: {
+                  enum: [
+                    'running',
+                    'ended',
+                  ],
+                  type: 'string',
+                },
+                step_index: {
+                  exclusiveMinimum: 0,
+                  maximum: 9007199254740991,
+                  type: 'integer',
+                },
+                task_id: {
+                  type: 'string',
+                },
+                title: {
+                  type: 'string',
+                },
+                type: {
+                  const: 'notification',
+                  type: 'string',
+                },
+              },
+              required: [
+                'type',
+                'item_id',
+                'status',
+                'created_at',
+                'notification_id',
+                'title',
+                'body',
+                'severity',
+                'notification_type',
+                'source',
+              ],
+              type: 'object',
+            },
+            {
+              properties: {
+                compacted_count: {
+                  maximum: 9007199254740991,
+                  minimum: 0,
+                  type: 'integer',
+                },
+                created_at: {
+                  type: 'string',
+                },
+                debug: {
+                  properties: {
+                    finish_reason: {
+                      type: 'string',
+                    },
+                    timing: {
+                      properties: {
+                        client_blocked_ms: {
+                          type: 'number',
+                        },
+                        client_consume_ms: {
+                          type: 'number',
+                        },
+                        first_token_ms: {
+                          type: 'number',
+                        },
+                        request_build_ms: {
+                          type: 'number',
+                        },
+                        server_decode_ms: {
+                          type: 'number',
+                        },
+                        server_first_token_ms: {
+                          type: 'number',
+                        },
+                        stream_ms: {
+                          type: 'number',
+                        },
+                      },
+                      type: 'object',
+                    },
+                    usage: {
+                      properties: {
+                        input_cache_creation: {
+                          minimum: 0,
+                          type: 'number',
+                        },
+                        input_cache_read: {
+                          minimum: 0,
+                          type: 'number',
+                        },
+                        input_other: {
+                          minimum: 0,
+                          type: 'number',
+                        },
+                        output: {
+                          minimum: 0,
+                          type: 'number',
+                        },
+                      },
+                      required: [
+                        'input_other',
+                        'output',
+                        'input_cache_read',
+                        'input_cache_creation',
+                      ],
+                      type: 'object',
+                    },
+                  },
+                  type: 'object',
+                },
+                instruction: {
+                  type: 'string',
+                },
+                item_id: {
+                  minLength: 1,
+                  type: 'string',
+                },
+                kind: {
+                  const: 'compaction',
+                  type: 'string',
+                },
+                outcome: {
+                  enum: [
+                    'completed',
+                    'interrupted',
+                    'failed',
+                  ],
+                  type: 'string',
+                },
+                status: {
+                  enum: [
+                    'running',
+                    'ended',
+                  ],
+                  type: 'string',
+                },
+                step_index: {
+                  exclusiveMinimum: 0,
+                  maximum: 9007199254740991,
+                  type: 'integer',
+                },
+                summary: {
+                  type: 'string',
+                },
+                tokens_after: {
+                  minimum: 0,
+                  type: 'number',
+                },
+                tokens_before: {
+                  minimum: 0,
+                  type: 'number',
+                },
+                trigger: {
+                  enum: [
+                    'manual',
+                    'auto',
+                  ],
+                  type: 'string',
+                },
+                type: {
+                  const: 'system',
+                  type: 'string',
+                },
+              },
+              required: [
+                'type',
+                'item_id',
+                'status',
+                'created_at',
+                'kind',
+                'trigger',
+              ],
+              type: 'object',
+            },
+            {
+              properties: {
+                created_at: {
+                  type: 'string',
+                },
+                debug: {
+                  properties: {
+                    finish_reason: {
+                      type: 'string',
+                    },
+                    timing: {
+                      properties: {
+                        client_blocked_ms: {
+                          type: 'number',
+                        },
+                        client_consume_ms: {
+                          type: 'number',
+                        },
+                        first_token_ms: {
+                          type: 'number',
+                        },
+                        request_build_ms: {
+                          type: 'number',
+                        },
+                        server_decode_ms: {
+                          type: 'number',
+                        },
+                        server_first_token_ms: {
+                          type: 'number',
+                        },
+                        stream_ms: {
+                          type: 'number',
+                        },
+                      },
+                      type: 'object',
+                    },
+                    usage: {
+                      properties: {
+                        input_cache_creation: {
+                          minimum: 0,
+                          type: 'number',
+                        },
+                        input_cache_read: {
+                          minimum: 0,
+                          type: 'number',
+                        },
+                        input_other: {
+                          minimum: 0,
+                          type: 'number',
+                        },
+                        output: {
+                          minimum: 0,
+                          type: 'number',
+                        },
+                      },
+                      required: [
+                        'input_other',
+                        'output',
+                        'input_cache_read',
+                        'input_cache_creation',
+                      ],
+                      type: 'object',
+                    },
+                  },
+                  type: 'object',
+                },
+                forked_from: {
+                  properties: {
+                    agent_id: {
+                      minLength: 1,
+                      type: 'string',
+                    },
+                  },
+                  required: [
+                    'agent_id',
+                  ],
+                  type: 'object',
+                },
+                item_id: {
+                  minLength: 1,
+                  type: 'string',
+                },
+                kind: {
+                  const: 'fork_boundary',
+                  type: 'string',
+                },
+                outcome: {
+                  enum: [
+                    'completed',
+                    'interrupted',
+                    'failed',
+                  ],
+                  type: 'string',
+                },
+                source: {
+                  enum: [
+                    'btw',
+                    'fork',
+                  ],
+                  type: 'string',
+                },
+                status: {
+                  enum: [
+                    'running',
+                    'ended',
+                  ],
+                  type: 'string',
+                },
+                step_index: {
+                  exclusiveMinimum: 0,
+                  maximum: 9007199254740991,
+                  type: 'integer',
+                },
+                type: {
+                  const: 'system',
+                  type: 'string',
+                },
+              },
+              required: [
+                'type',
+                'item_id',
+                'status',
+                'created_at',
+                'kind',
+                'source',
+                'forked_from',
+              ],
+              type: 'object',
+            },
+          ],
+        },
+        session_id: {
+          minLength: 1,
+          type: 'string',
+        },
+        turn_id: {
+          minLength: 1,
+          type: 'string',
+        },
+        type: {
+          enum: [
+            'item.started',
+            'item.ended',
+          ],
+          type: 'string',
+        },
+      },
+      required: [
+        'type',
+        'session_id',
+        'agent_id',
+        'event_created_at',
+        'turn_id',
+        'item',
+      ],
+      type: 'object',
+    },
+  },
+  {
+    name: 'item.delta',
+    title: 'Item Delta',
+    summary: 'Text appended to field of a running item: text of assistant_message and reasoning, input_text and output of tool_call.',
+    direction: 'server_to_client',
+    payload: {
+      properties: {
+        agent_id: {
+          minLength: 1,
+          type: 'string',
+        },
+        delta: {
+          type: 'string',
+        },
+        event_created_at: {
+          type: 'string',
+        },
+        field: {
+          enum: [
+            'text',
+            'input_text',
+            'output',
+          ],
+          type: 'string',
+        },
+        item_id: {
+          minLength: 1,
+          type: 'string',
+        },
+        session_id: {
+          minLength: 1,
+          type: 'string',
+        },
+        turn_id: {
+          minLength: 1,
+          type: 'string',
+        },
+        type: {
+          const: 'item.delta',
+          type: 'string',
+        },
+      },
+      required: [
+        'type',
+        'session_id',
+        'agent_id',
+        'event_created_at',
+        'turn_id',
+        'item_id',
+        'field',
+        'delta',
+      ],
+      type: 'object',
+    },
+  },
+  {
+    name: 'item.removed',
+    title: 'Item Removed',
+    summary: 'A running item that will not be finished, for example after a request retry restarts the step.',
+    direction: 'server_to_client',
+    payload: {
+      properties: {
+        agent_id: {
+          minLength: 1,
+          type: 'string',
+        },
+        event_created_at: {
+          type: 'string',
+        },
+        item_id: {
+          minLength: 1,
+          type: 'string',
+        },
+        session_id: {
+          minLength: 1,
+          type: 'string',
+        },
+        turn_id: {
+          minLength: 1,
+          type: 'string',
+        },
+        type: {
+          const: 'item.removed',
+          type: 'string',
+        },
+      },
+      required: [
+        'type',
+        'session_id',
+        'agent_id',
+        'event_created_at',
+        'turn_id',
+        'item_id',
+      ],
+      type: 'object',
+    },
+  },
+  {
+    name: 'item.updated',
+    title: 'Item Updated',
+    summary: 'Fields of a running tool_call item that changed; set is merged shallowly into the client copy.',
+    direction: 'server_to_client',
+    payload: {
+      properties: {
+        agent_id: {
+          minLength: 1,
+          type: 'string',
+        },
+        event_created_at: {
+          type: 'string',
+        },
+        item_id: {
+          minLength: 1,
+          type: 'string',
+        },
+        session_id: {
+          minLength: 1,
+          type: 'string',
+        },
+        set: {
+          properties: {
+            agent_refs: {
+              items: {
+                properties: {
+                  agent_id: {
+                    minLength: 1,
+                    type: 'string',
+                  },
+                  role: {
+                    enum: [
+                      'child',
+                      'member',
+                    ],
+                    type: 'string',
+                  },
+                  swarm_index: {
+                    maximum: 9007199254740991,
+                    minimum: 0,
+                    type: 'integer',
+                  },
+                  task_id: {
+                    type: 'string',
+                  },
+                },
+                required: [
+                  'agent_id',
+                  'role',
+                ],
+                type: 'object',
+              },
+              type: 'array',
+            },
+            created_at: {
+              type: 'string',
+            },
+            debug: {
+              properties: {
+                finish_reason: {
+                  type: 'string',
+                },
+                timing: {
+                  properties: {
+                    client_blocked_ms: {
+                      type: 'number',
+                    },
+                    client_consume_ms: {
+                      type: 'number',
+                    },
+                    first_token_ms: {
+                      type: 'number',
+                    },
+                    request_build_ms: {
+                      type: 'number',
+                    },
+                    server_decode_ms: {
+                      type: 'number',
+                    },
+                    server_first_token_ms: {
+                      type: 'number',
+                    },
+                    stream_ms: {
+                      type: 'number',
+                    },
+                  },
+                  type: 'object',
+                },
+                usage: {
+                  properties: {
+                    input_cache_creation: {
+                      minimum: 0,
+                      type: 'number',
+                    },
+                    input_cache_read: {
+                      minimum: 0,
+                      type: 'number',
+                    },
+                    input_other: {
+                      minimum: 0,
+                      type: 'number',
+                    },
+                    output: {
+                      minimum: 0,
+                      type: 'number',
+                    },
+                  },
+                  required: [
+                    'input_other',
+                    'output',
+                    'input_cache_read',
+                    'input_cache_creation',
+                  ],
+                  type: 'object',
+                },
+              },
+              type: 'object',
+            },
+            display: {},
+            ended_at: {
+              type: 'string',
+            },
+            error: {
+              type: 'string',
+            },
+            fields: {
+              additionalProperties: {},
+              propertyNames: {
+                type: 'string',
+              },
+              type: 'object',
+            },
+            input: {},
+            input_text: {
+              type: 'string',
+            },
+            interaction_id: {
+              type: 'string',
+            },
+            media: {
+              items: {
+                properties: {
+                  file_id: {
+                    type: 'string',
+                  },
+                  kind: {
+                    enum: [
+                      'image',
+                      'video',
+                      'audio',
+                    ],
+                    type: 'string',
+                  },
+                  media_type: {
+                    type: 'string',
+                  },
+                  url: {
+                    type: 'string',
+                  },
+                },
+                required: [
+                  'kind',
+                ],
+                type: 'object',
+              },
+              type: 'array',
+            },
+            name: {
+              type: 'string',
+            },
+            note: {
+              type: 'string',
+            },
+            outcome: {
+              enum: [
+                'completed',
+                'interrupted',
+                'failed',
+              ],
+              type: 'string',
+            },
+            output: {
+              type: 'string',
+            },
+            stage: {
+              enum: [
+                'input',
+                'awaiting_approval',
+                'executing',
+              ],
+              type: 'string',
+            },
+            started_at: {
+              type: 'string',
+            },
+            status: {
+              enum: [
+                'running',
+                'ended',
+              ],
+              type: 'string',
+            },
+            step_index: {
+              exclusiveMinimum: 0,
+              maximum: 9007199254740991,
+              type: 'integer',
+            },
+            task_id: {
+              type: 'string',
+            },
+          },
+          type: 'object',
+        },
+        turn_id: {
+          minLength: 1,
+          type: 'string',
+        },
+        type: {
+          const: 'item.updated',
+          type: 'string',
+        },
+      },
+      required: [
+        'type',
+        'session_id',
+        'agent_id',
+        'event_created_at',
+        'turn_id',
+        'item_id',
+        'set',
+      ],
+      type: 'object',
+    },
+  },
+  {
+    name: 'notice',
+    title: 'Notice',
+    summary: 'Live warning or error raised by an agent, such as a context compaction that did not finish; not part of the turns and not sent again on subscribe.',
+    direction: 'server_to_client',
+    payload: {
+      properties: {
+        agent_id: {
+          minLength: 1,
+          type: 'string',
+        },
+        code: {
+          type: 'string',
+        },
+        detail: {
+          type: 'string',
+        },
+        event_created_at: {
+          type: 'string',
+        },
+        level: {
+          enum: [
+            'info',
+            'warning',
+            'error',
+          ],
+          type: 'string',
+        },
+        session_id: {
+          minLength: 1,
+          type: 'string',
+        },
+        title: {
+          type: 'string',
+        },
+        type: {
+          const: 'notice',
+          type: 'string',
+        },
+      },
+      required: [
+        'level',
+        'title',
+        'type',
+        'session_id',
+        'agent_id',
+        'event_created_at',
+      ],
+      type: 'object',
+    },
+  },
+  {
+    name: 'ping',
+    title: 'Ping',
+    summary: 'Heartbeat sent by the server every 10 seconds; clients answer with pong. The server closes a connection that sends nothing for 20 seconds, and a client that receives nothing for 25 seconds should reconnect.',
+    direction: 'server_to_client',
+    payload: {
+      properties: {
+        type: {
+          const: 'ping',
+          type: 'string',
+        },
+      },
+      required: [
+        'type',
+      ],
+      type: 'object',
+    },
+  },
+  {
+    name: 'pong',
+    title: 'Pong',
+    summary: 'Reply to a server ping.',
+    direction: 'client_to_server',
+    payload: {
+      properties: {
+        type: {
+          const: 'pong',
+          type: 'string',
+        },
+      },
+      required: [
+        'type',
+      ],
+      type: 'object',
+    },
+  },
+  {
+    name: 'response',
+    title: 'Response',
+    summary: 'Reply to one client command, matched by request_id; code 0 means success. Replies to task.watch, task.stop and task.background carry the task state. A command without a request_id closes the connection with code 1008.',
+    direction: 'server_to_client',
+    payload: {
+      properties: {
+        code: {
+          maximum: 9007199254740991,
+          minimum: -9007199254740991,
+          type: 'integer',
+        },
+        msg: {
+          type: 'string',
+        },
+        request_id: {
+          type: 'string',
+        },
+        task: {
+          properties: {
+            child_agent_id: {
+              type: 'string',
+            },
+            command: {
+              type: 'string',
+            },
+            description: {
+              type: 'string',
+            },
+            detached: {
+              type: 'boolean',
+            },
+            ended_at: {
+              type: 'string',
+            },
+            error: {
+              type: 'string',
+            },
+            kind: {
+              enum: [
+                'shell',
+                'subagent',
+                'other',
+              ],
+              type: 'string',
+            },
+            model: {
+              type: 'string',
+            },
+            outcome: {
+              enum: [
+                'completed',
+                'failed',
+                'timed_out',
+                'killed',
+                'lost',
+              ],
+              type: 'string',
+            },
+            parent_tool_call_id: {
+              type: 'string',
+            },
+            phase: {
+              enum: [
+                'working',
+                'suspended',
+              ],
+              type: 'string',
+            },
+            result_summary: {
+              type: 'string',
+            },
+            started_at: {
+              type: 'string',
+            },
+            state_reason: {
+              type: 'string',
+            },
+            status: {
+              enum: [
+                'running',
+                'ended',
+              ],
+              type: 'string',
+            },
+            swarm_index: {
+              maximum: 9007199254740991,
+              minimum: 0,
+              type: 'integer',
+            },
+            task_id: {
+              minLength: 1,
+              type: 'string',
+            },
+            thinking: {
+              type: 'string',
+            },
+          },
+          required: [
+            'task_id',
+            'kind',
+            'status',
+            'detached',
+          ],
+          type: 'object',
+        },
+        type: {
+          const: 'response',
+          type: 'string',
+        },
+      },
+      required: [
+        'type',
+        'request_id',
+        'code',
+      ],
+      type: 'object',
+    },
+  },
+  {
+    name: 'session_event',
+    title: 'Session Event',
+    summary: 'Flat global event sent to every connection with event_created_at and its full state.',
+    direction: 'server_to_client',
+    payload: {
+      oneOf: [
+        {
+          properties: {
+            change: {
+              enum: [
+                'created',
+                'updated',
+                'archived',
+                'restored',
+                'deleted',
+              ],
+              type: 'string',
+            },
+            event_created_at: {
+              type: 'string',
+            },
+            session: {
+              properties: {
+                activity: {
+                  enum: [
+                    'idle',
+                    'turn',
+                    'background',
+                  ],
+                  type: 'string',
+                },
+                archived: {
+                  type: 'boolean',
+                },
+                archived_at: {
+                  type: 'string',
+                },
+                created_at: {
+                  type: 'string',
+                },
+                cwd: {
+                  deprecated: true,
+                  type: 'string',
+                },
+                environment_cwd: {
+                  type: 'string',
+                },
+                environment_id: {
+                  type: 'string',
+                },
+                git: {
+                  properties: {
+                    branch: {
+                      type: 'string',
+                    },
+                    pull_request: {
+                      properties: {
+                        number: {
+                          maximum: 9007199254740991,
+                          minimum: -9007199254740991,
+                          type: 'integer',
+                        },
+                        state: {
+                          enum: [
+                            'open',
+                            'closed',
+                            'merged',
+                          ],
+                          type: 'string',
+                        },
+                        url: {
+                          type: 'string',
+                        },
+                      },
+                      required: [
+                        'number',
+                        'state',
+                        'url',
+                      ],
+                      type: 'object',
+                    },
+                  },
+                  type: 'object',
+                },
+                host_id: {
+                  type: 'string',
+                },
+                id: {
+                  minLength: 1,
+                  type: 'string',
+                },
+                last_prompt: {
+                  type: 'string',
+                },
+                last_turn_outcome: {
+                  enum: [
+                    'completed',
+                    'interrupted',
+                    'failed',
+                  ],
+                  type: 'string',
+                },
+                metadata: {
+                  additionalProperties: {},
+                  propertyNames: {
+                    type: 'string',
+                  },
+                  type: 'object',
+                },
+                pending_interaction: {
+                  enum: [
+                    'none',
+                    'approval',
+                    'question',
+                  ],
+                  type: 'string',
+                },
+                title: {
+                  type: 'string',
+                },
+                updated_at: {
+                  type: 'string',
+                },
+                workspace_id: {
+                  pattern: '^wd_[a-z0-9._-]+_[0-9a-f]{12}$|^wm_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+                  type: 'string',
+                },
+                workspace_root: {
+                  type: 'string',
+                },
+              },
+              required: [
+                'id',
+                'workspace_id',
+                'cwd',
+                'title',
+                'created_at',
+                'updated_at',
+                'activity',
+              ],
+              type: 'object',
+            },
+            type: {
+              const: 'session',
+              type: 'string',
+            },
+          },
+          required: [
+            'type',
+            'change',
+            'session',
+            'event_created_at',
+          ],
+          type: 'object',
+        },
+        {
+          properties: {
+            change: {
+              enum: [
+                'created',
+                'updated',
+                'deleted',
+              ],
+              type: 'string',
+            },
+            event_created_at: {
+              type: 'string',
+            },
+            type: {
+              const: 'workspace',
+              type: 'string',
+            },
+            workspace: {
+              properties: {
+                additional_dirs: {
+                  items: {
+                    type: 'string',
+                  },
+                  type: 'array',
+                },
+                created_at: {
+                  type: 'string',
+                },
+                id: {
+                  pattern: '^wd_[a-z0-9._-]+_[0-9a-f]{12}$|^wm_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+                  type: 'string',
+                },
+                kind: {
+                  enum: [
+                    'managed',
+                    'implicit',
+                  ],
+                  type: 'string',
+                },
+                last_opened_at: {
+                  type: 'string',
+                },
+                name: {
+                  maxLength: 100,
+                  minLength: 1,
+                  type: 'string',
+                },
+                root: {
+                  minLength: 1,
+                  type: 'string',
+                },
+                session_count: {
+                  maximum: 9007199254740991,
+                  minimum: 0,
+                  type: 'integer',
+                },
+              },
+              required: [
+                'id',
+                'root',
+                'name',
+                'kind',
+                'additional_dirs',
+                'created_at',
+                'last_opened_at',
+                'session_count',
+              ],
+              type: 'object',
+            },
+          },
+          required: [
+            'type',
+            'change',
+            'workspace',
+            'event_created_at',
+          ],
+          type: 'object',
+        },
+        {
+          properties: {
+            config: {
+              additionalProperties: {},
+              properties: {
+                auto_session_title: {
+                  type: 'boolean',
+                },
+                background: {},
+                default_model: {
+                  type: 'string',
+                },
+                default_permission_mode: {
+                  type: 'string',
+                },
+                default_plan_mode: {
+                  type: 'boolean',
+                },
+                default_provider: {
+                  type: 'string',
+                },
+                disable_feedback_survey: {
+                  type: 'boolean',
+                },
+                experimental: {
+                  additionalProperties: {
+                    type: 'boolean',
+                  },
+                  propertyNames: {
+                    type: 'string',
+                  },
+                  type: 'object',
+                },
+                extra_skill_dirs: {
+                  items: {
+                    type: 'string',
+                  },
+                  type: 'array',
+                },
+                hooks: {
+                  items: {},
+                  type: 'array',
+                },
+                loop_control: {},
+                merge_all_available_skills: {
+                  type: 'boolean',
+                },
+                models: {
+                  additionalProperties: {},
+                  propertyNames: {
+                    type: 'string',
+                  },
+                  type: 'object',
+                },
+                permission: {},
+                plan_mode: {
+                  type: 'boolean',
+                },
+                providers: {
+                  additionalProperties: {
+                    properties: {
+                      api_key_env: {
+                        type: 'string',
+                      },
+                      base_url: {
+                        type: 'string',
+                      },
+                      default_model: {
+                        type: 'string',
+                      },
+                      has_api_key: {
+                        type: 'boolean',
+                      },
+                      type: {
+                        type: 'string',
+                      },
+                    },
+                    required: [
+                      'type',
+                      'has_api_key',
+                    ],
+                    type: 'object',
+                  },
+                  default: {},
+                  propertyNames: {
+                    type: 'string',
+                  },
+                  type: 'object',
+                },
+                raw: {
+                  additionalProperties: {},
+                  propertyNames: {
+                    type: 'string',
+                  },
+                  type: 'object',
+                },
+                secondary_model: {},
+                services: {},
+                subagent: {},
+                telemetry: {
+                  type: 'boolean',
+                },
+                thinking: {},
+                yolo: {
+                  type: 'boolean',
+                },
+              },
+              type: 'object',
+            },
+            event_created_at: {
+              type: 'string',
+            },
+            type: {
+              const: 'config',
+              type: 'string',
+            },
+            warnings: {
+              items: {
+                properties: {
+                  domain: {
+                    type: 'string',
+                  },
+                  message: {
+                    type: 'string',
+                  },
+                },
+                required: [
+                  'message',
+                ],
+                type: 'object',
+              },
+              type: 'array',
+            },
+          },
+          required: [
+            'type',
+            'config',
+            'event_created_at',
+          ],
+          type: 'object',
+        },
+        {
+          properties: {
+            event_created_at: {
+              type: 'string',
+            },
+            kind: {
+              enum: [
+                'models',
+                'plugins',
+              ],
+              type: 'string',
+            },
+            type: {
+              const: 'invalidated',
+              type: 'string',
+            },
+          },
+          required: [
+            'type',
+            'kind',
+            'event_created_at',
+          ],
+          type: 'object',
+        },
+        {
+          properties: {
+            capability_id: {
+              type: 'string',
+            },
+            event_created_at: {
+              type: 'string',
+            },
+            install: {
+              properties: {
+                confirmation_required: {
+                  const: 'stop-processes',
+                  type: 'string',
+                },
+                error: {
+                  type: 'string',
+                },
+                note: {
+                  type: 'string',
+                },
+                percent: {
+                  maximum: 100,
+                  minimum: 0,
+                  type: 'number',
+                },
+                running: {
+                  type: 'boolean',
+                },
+                step: {
+                  type: 'string',
+                },
+              },
+              required: [
+                'running',
+              ],
+              type: 'object',
+            },
+            type: {
+              const: 'event.capability.changed',
+              type: 'string',
+            },
+          },
+          required: [
+            'type',
+            'capability_id',
+            'install',
+            'event_created_at',
+          ],
+          type: 'object',
+        },
+        {
+          properties: {
+            event_created_at: {
+              type: 'string',
+            },
+            hosts: {
+              items: {
+                properties: {
+                  connect_error: {
+                    type: 'string',
+                  },
+                  connect_failure: {
+                    type: 'string',
+                  },
+                  enabled: {
+                    type: 'boolean',
+                  },
+                  host: {
+                    type: 'string',
+                  },
+                  id: {
+                    type: 'string',
+                  },
+                  identity_file: {
+                    type: 'string',
+                  },
+                  name: {
+                    type: 'string',
+                  },
+                  remote_bin: {
+                    type: 'string',
+                  },
+                  remote_version: {
+                    type: 'string',
+                  },
+                  status: {
+                    enum: [
+                      'pending',
+                      'connecting',
+                      'ready',
+                      'disconnected',
+                    ],
+                    type: 'string',
+                  },
+                },
+                required: [
+                  'id',
+                  'host',
+                  'status',
+                ],
+                type: 'object',
+              },
+              type: 'array',
+            },
+            type: {
+              const: 'event.host.changed',
+              type: 'string',
+            },
+          },
+          required: [
+            'type',
+            'hosts',
+            'event_created_at',
+          ],
+          type: 'object',
+        },
+      ],
+    },
+  },
+  {
+    name: 'subscribe',
+    title: 'Subscribe',
+    summary: 'Start receiving agents of one session (agent_ids defaults to the main agent). The response comes first; then every newly added agent gets a turns frame with its latest page, or turns.failed when its conversation cannot be loaded, then turn, item and notice frames. When the session itself cannot be opened, the response carries the error code (40401 when it does not exist) and nothing is subscribed.',
+    direction: 'client_to_server',
+    payload: {
+      properties: {
+        agent_ids: {
+          items: {
+            minLength: 1,
+            type: 'string',
+          },
+          minItems: 1,
+          type: 'array',
+        },
+        request_id: {
+          minLength: 1,
+          type: 'string',
+        },
+        session_id: {
+          minLength: 1,
+          type: 'string',
+        },
+        type: {
+          const: 'subscribe',
+          type: 'string',
+        },
+      },
+      required: [
+        'type',
+        'request_id',
+        'session_id',
+      ],
+      type: 'object',
+    },
+  },
+  {
+    name: 'task',
+    title: 'Task',
+    summary: 'Full state of one task of a subscribed agent, sent on every change; the frame for an ended task is its last one.',
+    direction: 'server_to_client',
+    payload: {
+      properties: {
+        agent_id: {
+          minLength: 1,
+          type: 'string',
+        },
+        child_agent_id: {
+          type: 'string',
+        },
+        command: {
+          type: 'string',
+        },
+        description: {
+          type: 'string',
+        },
+        detached: {
+          type: 'boolean',
+        },
+        ended_at: {
+          type: 'string',
+        },
+        error: {
+          type: 'string',
+        },
+        event_created_at: {
+          type: 'string',
+        },
+        kind: {
+          enum: [
+            'shell',
+            'subagent',
+            'other',
+          ],
+          type: 'string',
+        },
+        model: {
+          type: 'string',
+        },
+        outcome: {
+          enum: [
+            'completed',
+            'failed',
+            'timed_out',
+            'killed',
+            'lost',
+          ],
+          type: 'string',
+        },
+        parent_tool_call_id: {
+          type: 'string',
+        },
+        phase: {
+          enum: [
+            'working',
+            'suspended',
+          ],
+          type: 'string',
+        },
+        result_summary: {
+          type: 'string',
+        },
+        session_id: {
+          minLength: 1,
+          type: 'string',
+        },
+        started_at: {
+          type: 'string',
+        },
+        state_reason: {
+          type: 'string',
+        },
+        status: {
+          enum: [
+            'running',
+            'ended',
+          ],
+          type: 'string',
+        },
+        swarm_index: {
+          maximum: 9007199254740991,
+          minimum: 0,
+          type: 'integer',
+        },
+        task_id: {
+          minLength: 1,
+          type: 'string',
+        },
+        thinking: {
+          type: 'string',
+        },
+        type: {
+          const: 'task',
+          type: 'string',
+        },
+      },
+      required: [
+        'task_id',
+        'kind',
+        'status',
+        'detached',
+        'type',
+        'session_id',
+        'agent_id',
+        'event_created_at',
+      ],
+      type: 'object',
+    },
+  },
+  {
+    name: 'task.background',
+    title: 'Task Background',
+    summary: 'Stop the tool call that started a task from waiting for it, so the task keeps running in the background; the response carries its state.',
+    direction: 'client_to_server',
+    payload: {
+      properties: {
+        agent_id: {
+          minLength: 1,
+          type: 'string',
+        },
+        request_id: {
+          minLength: 1,
+          type: 'string',
+        },
+        session_id: {
+          minLength: 1,
+          type: 'string',
+        },
+        task_id: {
+          minLength: 1,
+          type: 'string',
+        },
+        type: {
+          const: 'task.background',
+          type: 'string',
+        },
+      },
+      required: [
+        'type',
+        'request_id',
+        'session_id',
+        'agent_id',
+        'task_id',
+      ],
+      type: 'object',
+    },
+  },
+  {
+    name: 'task.list',
+    title: 'Task List',
+    summary: 'Every task an agent is running right now, sent when a connection starts receiving that agent; it replaces the client list.',
+    direction: 'server_to_client',
+    payload: {
+      properties: {
+        agent_id: {
+          minLength: 1,
+          type: 'string',
+        },
+        session_id: {
+          minLength: 1,
+          type: 'string',
+        },
+        tasks: {
+          items: {
+            properties: {
+              child_agent_id: {
+                type: 'string',
+              },
+              command: {
+                type: 'string',
+              },
+              description: {
+                type: 'string',
+              },
+              detached: {
+                type: 'boolean',
+              },
+              ended_at: {
+                type: 'string',
+              },
+              error: {
+                type: 'string',
+              },
+              kind: {
+                enum: [
+                  'shell',
+                  'subagent',
+                  'other',
+                ],
+                type: 'string',
+              },
+              model: {
+                type: 'string',
+              },
+              outcome: {
+                enum: [
+                  'completed',
+                  'failed',
+                  'timed_out',
+                  'killed',
+                  'lost',
+                ],
+                type: 'string',
+              },
+              parent_tool_call_id: {
+                type: 'string',
+              },
+              phase: {
+                enum: [
+                  'working',
+                  'suspended',
+                ],
+                type: 'string',
+              },
+              result_summary: {
+                type: 'string',
+              },
+              started_at: {
+                type: 'string',
+              },
+              state_reason: {
+                type: 'string',
+              },
+              status: {
+                enum: [
+                  'running',
+                  'ended',
+                ],
+                type: 'string',
+              },
+              swarm_index: {
+                maximum: 9007199254740991,
+                minimum: 0,
+                type: 'integer',
+              },
+              task_id: {
+                minLength: 1,
+                type: 'string',
+              },
+              thinking: {
+                type: 'string',
+              },
+            },
+            required: [
+              'task_id',
+              'kind',
+              'status',
+              'detached',
+            ],
+            type: 'object',
+          },
+          type: 'array',
+        },
+        type: {
+          const: 'task.list',
+          type: 'string',
+        },
+      },
+      required: [
+        'type',
+        'session_id',
+        'agent_id',
+        'tasks',
+      ],
+      type: 'object',
+    },
+  },
+  {
+    name: 'task.output',
+    title: 'Task Output',
+    summary: 'Task output starting at a UTF-8 byte offset, sent only to connections watching the task.',
+    direction: 'server_to_client',
+    payload: {
+      properties: {
+        agent_id: {
+          minLength: 1,
+          type: 'string',
+        },
+        offset: {
+          maximum: 9007199254740991,
+          minimum: 0,
+          type: 'integer',
+        },
+        session_id: {
+          minLength: 1,
+          type: 'string',
+        },
+        task_id: {
+          minLength: 1,
+          type: 'string',
+        },
+        text: {
+          type: 'string',
+        },
+        type: {
+          const: 'task.output',
+          type: 'string',
+        },
+      },
+      required: [
+        'type',
+        'session_id',
+        'agent_id',
+        'task_id',
+        'offset',
+        'text',
+      ],
+      type: 'object',
+    },
+  },
+  {
+    name: 'task.stop',
+    title: 'Task Stop',
+    summary: 'Stop one task; the response carries its state, and an ended task just replies with it.',
+    direction: 'client_to_server',
+    payload: {
+      properties: {
+        agent_id: {
+          minLength: 1,
+          type: 'string',
+        },
+        request_id: {
+          minLength: 1,
+          type: 'string',
+        },
+        session_id: {
+          minLength: 1,
+          type: 'string',
+        },
+        task_id: {
+          minLength: 1,
+          type: 'string',
+        },
+        type: {
+          const: 'task.stop',
+          type: 'string',
+        },
+      },
+      required: [
+        'type',
+        'request_id',
+        'session_id',
+        'agent_id',
+        'task_id',
+      ],
+      type: 'object',
+    },
+  },
+  {
+    name: 'task.unwatch',
+    title: 'Task Unwatch',
+    summary: 'Stop streaming one task\'s output to this connection.',
+    direction: 'client_to_server',
+    payload: {
+      properties: {
+        agent_id: {
+          minLength: 1,
+          type: 'string',
+        },
+        request_id: {
+          minLength: 1,
+          type: 'string',
+        },
+        session_id: {
+          minLength: 1,
+          type: 'string',
+        },
+        task_id: {
+          minLength: 1,
+          type: 'string',
+        },
+        type: {
+          const: 'task.unwatch',
+          type: 'string',
+        },
+      },
+      required: [
+        'type',
+        'request_id',
+        'session_id',
+        'agent_id',
+        'task_id',
+      ],
+      type: 'object',
+    },
+  },
+  {
+    name: 'task.watch',
+    title: 'Task Watch',
+    summary: 'Stream the output of one task owned by agent_id to this connection without a session subscription. The first chunk covers at most tail_bytes; since_offset resumes after output the client already has.',
+    direction: 'client_to_server',
+    payload: {
+      properties: {
+        agent_id: {
+          minLength: 1,
+          type: 'string',
+        },
+        request_id: {
+          minLength: 1,
+          type: 'string',
+        },
+        session_id: {
+          minLength: 1,
+          type: 'string',
+        },
+        since_offset: {
+          maximum: 9007199254740991,
+          minimum: 0,
+          type: 'integer',
+        },
+        tail_bytes: {
+          maximum: 1048576,
+          minimum: 1,
+          type: 'integer',
+        },
+        task_id: {
+          minLength: 1,
+          type: 'string',
+        },
+        type: {
+          const: 'task.watch',
+          type: 'string',
+        },
+      },
+      required: [
+        'type',
+        'request_id',
+        'session_id',
+        'agent_id',
+        'task_id',
+      ],
+      type: 'object',
+    },
+  },
+  {
+    name: 'todo',
+    title: 'Todo',
+    summary: 'Todo list of one subscribed agent, sent when a connection starts receiving that agent and on every change, including undo; it replaces the client list.',
+    direction: 'server_to_client',
+    payload: {
+      properties: {
+        agent_id: {
+          minLength: 1,
+          type: 'string',
+        },
+        event_created_at: {
+          type: 'string',
+        },
+        items: {
+          items: {
+            properties: {
+              status: {
+                enum: [
+                  'pending',
+                  'in_progress',
+                  'done',
+                ],
+                type: 'string',
+              },
+              title: {
+                type: 'string',
+              },
+            },
+            required: [
+              'title',
+              'status',
+            ],
+            type: 'object',
+          },
+          type: 'array',
+        },
+        session_id: {
+          minLength: 1,
+          type: 'string',
+        },
+        type: {
+          const: 'todo',
+          type: 'string',
+        },
+      },
+      required: [
+        'type',
+        'session_id',
+        'agent_id',
+        'event_created_at',
+        'items',
+      ],
+      type: 'object',
+    },
+  },
+  {
+    name: 'turn',
+    title: 'Turn',
+    summary: 'turn.started or turn.ended with the turn without its items; it replaces the client copy of the turn and keeps its items. turn.ended is sent again when an ended turn is corrected.',
+    direction: 'server_to_client',
+    payload: {
+      properties: {
+        agent_id: {
+          minLength: 1,
+          type: 'string',
+        },
+        event_created_at: {
+          type: 'string',
+        },
+        session_id: {
+          minLength: 1,
+          type: 'string',
+        },
+        turn: {
+          properties: {
+            continuation: {
+              enum: [
+                'turn',
+                'background',
+                'none',
+              ],
+              type: 'string',
+            },
+            duration_ms: {
+              minimum: 0,
+              type: 'number',
+            },
+            end_reason: {
+              enum: [
+                'user_cancelled',
+                'aborted',
+                'max_steps',
+                'error',
+                'filtered',
+                'blocked',
+              ],
+              type: 'string',
+            },
+            ended_at: {
+              type: 'string',
+            },
+            error: {
+              properties: {
+                code: {
+                  type: 'string',
+                },
+                message: {
+                  type: 'string',
+                },
+                name: {
+                  type: 'string',
+                },
+                request_id: {
+                  type: 'string',
+                },
+                retryable: {
+                  type: 'boolean',
+                },
+                status_code: {
+                  maximum: 9007199254740991,
+                  minimum: -9007199254740991,
+                  type: 'integer',
+                },
+              },
+              required: [
+                'code',
+                'message',
+              ],
+              type: 'object',
+            },
+            kind: {
+              enum: [
+                'agent',
+                'system',
+              ],
+              type: 'string',
+            },
+            ordinal: {
+              maximum: 9007199254740991,
+              minimum: 0,
+              type: 'integer',
+            },
+            outcome: {
+              enum: [
+                'completed',
+                'interrupted',
+                'failed',
+              ],
+              type: 'string',
+            },
+            retry: {
+              properties: {
+                attempt: {
+                  exclusiveMinimum: 0,
+                  maximum: 9007199254740991,
+                  type: 'integer',
+                },
+                delay_ms: {
+                  minimum: 0,
+                  type: 'number',
+                },
+                error: {
+                  properties: {
+                    message: {
+                      type: 'string',
+                    },
+                    name: {
+                      type: 'string',
+                    },
+                    status_code: {
+                      maximum: 9007199254740991,
+                      minimum: -9007199254740991,
+                      type: 'integer',
+                    },
+                  },
+                  required: [
+                    'name',
+                    'message',
+                  ],
+                  type: 'object',
+                },
+                max_attempts: {
+                  exclusiveMinimum: 0,
+                  maximum: 9007199254740991,
+                  type: 'integer',
+                },
+                next_attempt: {
+                  exclusiveMinimum: 0,
+                  maximum: 9007199254740991,
+                  type: 'integer',
+                },
+              },
+              required: [
+                'attempt',
+                'next_attempt',
+                'max_attempts',
+                'delay_ms',
+                'error',
+              ],
+              type: 'object',
+            },
+            started_at: {
+              type: 'string',
+            },
+            status: {
+              enum: [
+                'running',
+                'ended',
+              ],
+              type: 'string',
+            },
+            steps: {
+              items: {
+                properties: {
+                  ended_at: {
+                    type: 'string',
+                  },
+                  finish_reason: {
+                    type: 'string',
+                  },
+                  index: {
+                    exclusiveMinimum: 0,
+                    maximum: 9007199254740991,
+                    type: 'integer',
+                  },
+                  outcome: {
+                    enum: [
+                      'completed',
+                      'interrupted',
+                      'failed',
+                    ],
+                    type: 'string',
+                  },
+                  started_at: {
+                    type: 'string',
+                  },
+                  usage: {
+                    properties: {
+                      input_cache_creation: {
+                        minimum: 0,
+                        type: 'number',
+                      },
+                      input_cache_read: {
+                        minimum: 0,
+                        type: 'number',
+                      },
+                      input_other: {
+                        minimum: 0,
+                        type: 'number',
+                      },
+                      output: {
+                        minimum: 0,
+                        type: 'number',
+                      },
+                    },
+                    required: [
+                      'input_other',
+                      'output',
+                      'input_cache_read',
+                      'input_cache_creation',
+                    ],
+                    type: 'object',
+                  },
+                },
+                required: [
+                  'index',
+                  'outcome',
+                  'started_at',
+                ],
+                type: 'object',
+              },
+              type: 'array',
+            },
+            turn_id: {
+              minLength: 1,
+              type: 'string',
+            },
+            turn_number: {
+              maximum: 9007199254740991,
+              minimum: 0,
+              type: 'integer',
+            },
+            usage: {
+              properties: {
+                input_cache_creation: {
+                  minimum: 0,
+                  type: 'number',
+                },
+                input_cache_read: {
+                  minimum: 0,
+                  type: 'number',
+                },
+                input_other: {
+                  minimum: 0,
+                  type: 'number',
+                },
+                output: {
+                  minimum: 0,
+                  type: 'number',
+                },
+              },
+              required: [
+                'input_other',
+                'output',
+                'input_cache_read',
+                'input_cache_creation',
+              ],
+              type: 'object',
+            },
+          },
+          required: [
+            'turn_id',
+            'ordinal',
+            'kind',
+            'status',
+            'started_at',
+            'steps',
+          ],
+          type: 'object',
+        },
+        type: {
+          enum: [
+            'turn.started',
+            'turn.ended',
+          ],
+          type: 'string',
+        },
+      },
+      required: [
+        'type',
+        'session_id',
+        'agent_id',
+        'event_created_at',
+        'turn',
+      ],
+      type: 'object',
+    },
+  },
+  {
+    name: 'turn.updated',
+    title: 'Turn Updated',
+    summary: 'A step of a running turn ended (step, written into steps by index) or its retry state changed; retry replaces the client copy and an absent retry clears it.',
+    direction: 'server_to_client',
+    payload: {
+      properties: {
+        agent_id: {
+          minLength: 1,
+          type: 'string',
+        },
+        event_created_at: {
+          type: 'string',
+        },
+        retry: {
+          properties: {
+            attempt: {
+              exclusiveMinimum: 0,
+              maximum: 9007199254740991,
+              type: 'integer',
+            },
+            delay_ms: {
+              minimum: 0,
+              type: 'number',
+            },
+            error: {
+              properties: {
+                message: {
+                  type: 'string',
+                },
+                name: {
+                  type: 'string',
+                },
+                status_code: {
+                  maximum: 9007199254740991,
+                  minimum: -9007199254740991,
+                  type: 'integer',
+                },
+              },
+              required: [
+                'name',
+                'message',
+              ],
+              type: 'object',
+            },
+            max_attempts: {
+              exclusiveMinimum: 0,
+              maximum: 9007199254740991,
+              type: 'integer',
+            },
+            next_attempt: {
+              exclusiveMinimum: 0,
+              maximum: 9007199254740991,
+              type: 'integer',
+            },
+          },
+          required: [
+            'attempt',
+            'next_attempt',
+            'max_attempts',
+            'delay_ms',
+            'error',
+          ],
+          type: 'object',
+        },
+        session_id: {
+          minLength: 1,
+          type: 'string',
+        },
+        step: {
+          properties: {
+            ended_at: {
+              type: 'string',
+            },
+            finish_reason: {
+              type: 'string',
+            },
+            index: {
+              exclusiveMinimum: 0,
+              maximum: 9007199254740991,
+              type: 'integer',
+            },
+            outcome: {
+              enum: [
+                'completed',
+                'interrupted',
+                'failed',
+              ],
+              type: 'string',
+            },
+            started_at: {
+              type: 'string',
+            },
+            usage: {
+              properties: {
+                input_cache_creation: {
+                  minimum: 0,
+                  type: 'number',
+                },
+                input_cache_read: {
+                  minimum: 0,
+                  type: 'number',
+                },
+                input_other: {
+                  minimum: 0,
+                  type: 'number',
+                },
+                output: {
+                  minimum: 0,
+                  type: 'number',
+                },
+              },
+              required: [
+                'input_other',
+                'output',
+                'input_cache_read',
+                'input_cache_creation',
+              ],
+              type: 'object',
+            },
+          },
+          required: [
+            'index',
+            'outcome',
+            'started_at',
+          ],
+          type: 'object',
+        },
+        turn_id: {
+          minLength: 1,
+          type: 'string',
+        },
+        type: {
+          const: 'turn.updated',
+          type: 'string',
+        },
+      },
+      required: [
+        'type',
+        'session_id',
+        'agent_id',
+        'event_created_at',
+        'turn_id',
+      ],
+      type: 'object',
+    },
+  },
+  {
+    name: 'turns',
+    title: 'Turns',
+    summary: 'Latest page of turns of an agent, sent when a connection starts receiving that agent, including after a reconnect; it replaces the client copy of those turns. Older pages come from GET /sessions/{session_id}/agents/{agent_id}/turns.',
+    direction: 'server_to_client',
+    payload: {
+      properties: {
+        agent_id: {
+          minLength: 1,
+          type: 'string',
+        },
+        event_created_at: {
+          type: 'string',
+        },
+        has_more: {
+          type: 'boolean',
+        },
+        session_id: {
+          minLength: 1,
+          type: 'string',
+        },
+        turns: {
+          items: {
+            properties: {
+              continuation: {
+                enum: [
+                  'turn',
+                  'background',
+                  'none',
+                ],
+                type: 'string',
+              },
+              duration_ms: {
+                minimum: 0,
+                type: 'number',
+              },
+              end_reason: {
+                enum: [
+                  'user_cancelled',
+                  'aborted',
+                  'max_steps',
+                  'error',
+                  'filtered',
+                  'blocked',
+                ],
+                type: 'string',
+              },
+              ended_at: {
+                type: 'string',
+              },
+              error: {
+                properties: {
+                  code: {
+                    type: 'string',
+                  },
+                  message: {
+                    type: 'string',
+                  },
+                  name: {
+                    type: 'string',
+                  },
+                  request_id: {
+                    type: 'string',
+                  },
+                  retryable: {
+                    type: 'boolean',
+                  },
+                  status_code: {
+                    maximum: 9007199254740991,
+                    minimum: -9007199254740991,
+                    type: 'integer',
+                  },
+                },
+                required: [
+                  'code',
+                  'message',
+                ],
+                type: 'object',
+              },
+              items: {
+                items: {
+                  anyOf: [
+                    {
+                      properties: {
+                        attachments: {
+                          items: {
+                            properties: {
+                              file_id: {
+                                type: 'string',
+                              },
+                              kind: {
+                                enum: [
+                                  'image',
+                                  'video',
+                                  'audio',
+                                  'file',
+                                ],
+                                type: 'string',
+                              },
+                              media_type: {
+                                type: 'string',
+                              },
+                              name: {
+                                type: 'string',
+                              },
+                              ordinal: {
+                                exclusiveMinimum: 0,
+                                maximum: 9007199254740991,
+                                type: 'integer',
+                              },
+                              size: {
+                                maximum: 9007199254740991,
+                                minimum: 0,
+                                type: 'integer',
+                              },
+                              url: {
+                                type: 'string',
+                              },
+                            },
+                            required: [
+                              'kind',
+                              'ordinal',
+                            ],
+                            type: 'object',
+                          },
+                          type: 'array',
+                        },
+                        created_at: {
+                          type: 'string',
+                        },
+                        debug: {
                           properties: {
-                            budget: {
+                            finish_reason: {
+                              type: 'string',
+                            },
+                            timing: {
                               properties: {
-                                overBudget: {
+                                client_blocked_ms: {
+                                  type: 'number',
+                                },
+                                client_consume_ms: {
+                                  type: 'number',
+                                },
+                                first_token_ms: {
+                                  type: 'number',
+                                },
+                                request_build_ms: {
+                                  type: 'number',
+                                },
+                                server_decode_ms: {
+                                  type: 'number',
+                                },
+                                server_first_token_ms: {
+                                  type: 'number',
+                                },
+                                stream_ms: {
+                                  type: 'number',
+                                },
+                              },
+                              type: 'object',
+                            },
+                            usage: {
+                              properties: {
+                                input_cache_creation: {
+                                  minimum: 0,
+                                  type: 'number',
+                                },
+                                input_cache_read: {
+                                  minimum: 0,
+                                  type: 'number',
+                                },
+                                input_other: {
+                                  minimum: 0,
+                                  type: 'number',
+                                },
+                                output: {
+                                  minimum: 0,
+                                  type: 'number',
+                                },
+                              },
+                              required: [
+                                'input_other',
+                                'output',
+                                'input_cache_read',
+                                'input_cache_creation',
+                              ],
+                              type: 'object',
+                            },
+                          },
+                          type: 'object',
+                        },
+                        item_id: {
+                          minLength: 1,
+                          type: 'string',
+                        },
+                        metadata: {
+                          additionalProperties: {},
+                          propertyNames: {
+                            type: 'string',
+                          },
+                          type: 'object',
+                        },
+                        origin: {
+                          oneOf: [
+                            {
+                              properties: {
+                                kind: {
+                                  const: 'user',
+                                  type: 'string',
+                                },
+                              },
+                              required: [
+                                'kind',
+                              ],
+                              type: 'object',
+                            },
+                            {
+                              properties: {
+                                args: {
+                                  type: 'string',
+                                },
+                                kind: {
+                                  const: 'skill',
+                                  type: 'string',
+                                },
+                                name: {
+                                  type: 'string',
+                                },
+                                path: {
+                                  type: 'string',
+                                },
+                              },
+                              required: [
+                                'kind',
+                                'name',
+                              ],
+                              type: 'object',
+                            },
+                            {
+                              properties: {
+                                args: {
+                                  type: 'string',
+                                },
+                                command: {
+                                  type: 'string',
+                                },
+                                kind: {
+                                  const: 'plugin_command',
+                                  type: 'string',
+                                },
+                                plugin_id: {
+                                  type: 'string',
+                                },
+                              },
+                              required: [
+                                'kind',
+                                'plugin_id',
+                                'command',
+                              ],
+                              type: 'object',
+                            },
+                            {
+                              properties: {
+                                coalesced_count: {
+                                  maximum: 9007199254740991,
+                                  minimum: 0,
+                                  type: 'integer',
+                                },
+                                job_id: {
+                                  type: 'string',
+                                },
+                                kind: {
+                                  const: 'cron',
+                                  type: 'string',
+                                },
+                                recurring: {
                                   type: 'boolean',
                                 },
-                                remainingTokens: {
-                                  anyOf: [
-                                    {
-                                      type: 'number',
-                                    },
-                                    {
-                                      type: 'null',
-                                    },
-                                  ],
+                                schedule: {
+                                  type: 'string',
                                 },
-                                remainingTurns: {
-                                  anyOf: [
-                                    {
-                                      type: 'number',
-                                    },
-                                    {
-                                      type: 'null',
-                                    },
-                                  ],
-                                },
-                                remainingWallClockMs: {
-                                  anyOf: [
-                                    {
-                                      type: 'number',
-                                    },
-                                    {
-                                      type: 'null',
-                                    },
-                                  ],
-                                },
-                                tokenBudget: {
-                                  anyOf: [
-                                    {
-                                      type: 'number',
-                                    },
-                                    {
-                                      type: 'null',
-                                    },
-                                  ],
-                                },
-                                tokenBudgetReached: {
-                                  type: 'boolean',
-                                },
-                                turnBudget: {
-                                  anyOf: [
-                                    {
-                                      type: 'number',
-                                    },
-                                    {
-                                      type: 'null',
-                                    },
-                                  ],
-                                },
-                                turnBudgetReached: {
-                                  type: 'boolean',
-                                },
-                                wallClockBudgetMs: {
-                                  anyOf: [
-                                    {
-                                      type: 'number',
-                                    },
-                                    {
-                                      type: 'null',
-                                    },
-                                  ],
-                                },
-                                wallClockBudgetReached: {
+                                stale: {
                                   type: 'boolean',
                                 },
                               },
                               required: [
-                                'tokenBudget',
-                                'turnBudget',
-                                'wallClockBudgetMs',
-                                'remainingTokens',
-                                'remainingTurns',
-                                'remainingWallClockMs',
-                                'tokenBudgetReached',
-                                'turnBudgetReached',
-                                'wallClockBudgetReached',
-                                'overBudget',
+                                'kind',
+                                'job_id',
+                                'schedule',
+                                'recurring',
+                                'coalesced_count',
+                                'stale',
                               ],
                               type: 'object',
                             },
-                            completionCriterion: {
-                              type: 'string',
-                            },
-                            goalId: {
-                              type: 'string',
-                            },
-                            objective: {
-                              type: 'string',
-                            },
-                            status: {
-                              enum: [
-                                'active',
-                                'paused',
-                                'blocked',
-                                'complete',
-                              ],
-                              type: 'string',
-                            },
-                            terminalReason: {
-                              type: 'string',
-                            },
-                            tokensUsed: {
-                              type: 'number',
-                            },
-                            turnsUsed: {
-                              type: 'number',
-                            },
-                            wallClockMs: {
-                              type: 'number',
-                            },
-                          },
-                          required: [
-                            'goalId',
-                            'objective',
-                            'status',
-                            'turnsUsed',
-                            'tokensUsed',
-                            'wallClockMs',
-                            'budget',
-                          ],
-                          type: 'object',
-                        },
-                        {
-                          type: 'null',
-                        },
-                      ],
-                    },
-                    type: {
-                      const: 'goal.updated',
-                      type: 'string',
-                    },
-                  },
-                  required: [
-                    'type',
-                    'agentId',
-                    'snapshot',
-                  ],
-                  type: 'object',
-                },
-                {
-                  properties: {
-                    activationId: {
-                      type: 'string',
-                    },
-                    agentId: {
-                      type: 'string',
-                    },
-                    skillArgs: {
-                      type: 'string',
-                    },
-                    skillName: {
-                      type: 'string',
-                    },
-                    skillPath: {
-                      type: 'string',
-                    },
-                    skillSource: {
-                      enum: [
-                        'project',
-                        'user',
-                        'extra',
-                        'builtin',
-                      ],
-                      type: 'string',
-                    },
-                    trigger: {
-                      enum: [
-                        'user-slash',
-                        'model-tool',
-                        'nested-skill',
-                      ],
-                      type: 'string',
-                    },
-                    type: {
-                      const: 'skill.activated',
-                      type: 'string',
-                    },
-                  },
-                  required: [
-                    'type',
-                    'agentId',
-                    'activationId',
-                    'skillName',
-                    'trigger',
-                  ],
-                  type: 'object',
-                },
-                {
-                  properties: {
-                    activationId: {
-                      type: 'string',
-                    },
-                    agentId: {
-                      type: 'string',
-                    },
-                    commandArgs: {
-                      type: 'string',
-                    },
-                    commandName: {
-                      type: 'string',
-                    },
-                    pluginId: {
-                      type: 'string',
-                    },
-                    trigger: {
-                      const: 'user-slash',
-                      type: 'string',
-                    },
-                    type: {
-                      const: 'plugin_command.activated',
-                      type: 'string',
-                    },
-                  },
-                  required: [
-                    'type',
-                    'agentId',
-                    'activationId',
-                    'pluginId',
-                    'commandName',
-                    'trigger',
-                  ],
-                  type: 'object',
-                },
-                {
-                  properties: {
-                    agentId: {
-                      type: 'string',
-                    },
-                    origin: {
-                      oneOf: [
-                        {
-                          properties: {
-                            kind: {
-                              const: 'user',
-                              type: 'string',
-                            },
-                            skillActivations: {
-                              items: {
-                                properties: {
-                                  activationId: {
-                                    type: 'string',
-                                  },
-                                  skillArgs: {
-                                    type: 'string',
-                                  },
-                                  skillName: {
-                                    type: 'string',
-                                  },
-                                  skillPath: {
-                                    type: 'string',
-                                  },
-                                  skillSource: {
-                                    enum: [
-                                      'project',
-                                      'user',
-                                      'extra',
-                                      'builtin',
-                                    ],
-                                    type: 'string',
-                                  },
-                                  skillType: {
-                                    type: 'string',
-                                  },
+                            {
+                              properties: {
+                                hook_event: {
+                                  type: 'string',
                                 },
-                                required: [
-                                  'activationId',
-                                  'skillName',
-                                ],
-                                type: 'object',
+                                kind: {
+                                  const: 'hook',
+                                  type: 'string',
+                                },
                               },
-                              type: 'array',
-                            },
-                          },
-                          required: [
-                            'kind',
-                          ],
-                          type: 'object',
-                        },
-                        {
-                          properties: {
-                            activationId: {
-                              type: 'string',
-                            },
-                            kind: {
-                              const: 'skill_activation',
-                              type: 'string',
-                            },
-                            skillArgs: {
-                              type: 'string',
-                            },
-                            skillName: {
-                              type: 'string',
-                            },
-                            skillPath: {
-                              type: 'string',
-                            },
-                            skillSource: {
-                              enum: [
-                                'project',
-                                'user',
-                                'extra',
-                                'builtin',
+                              required: [
+                                'kind',
+                                'hook_event',
                               ],
-                              type: 'string',
+                              type: 'object',
                             },
-                            skillType: {
-                              type: 'string',
-                            },
-                            trigger: {
-                              enum: [
-                                'user-slash',
-                                'model-tool',
-                                'nested-skill',
+                            {
+                              properties: {
+                                kind: {
+                                  const: 'goal',
+                                  type: 'string',
+                                },
+                              },
+                              required: [
+                                'kind',
                               ],
-                              type: 'string',
+                              type: 'object',
                             },
-                          },
-                          required: [
-                            'kind',
-                            'activationId',
-                            'skillName',
-                            'trigger',
-                          ],
-                          type: 'object',
-                        },
-                        {
-                          properties: {
-                            activationId: {
-                              type: 'string',
-                            },
-                            commandArgs: {
-                              type: 'string',
-                            },
-                            commandName: {
-                              type: 'string',
-                            },
-                            kind: {
-                              const: 'plugin_command',
-                              type: 'string',
-                            },
-                            pluginId: {
-                              type: 'string',
-                            },
-                            trigger: {
-                              const: 'user-slash',
-                              type: 'string',
-                            },
-                          },
-                          required: [
-                            'kind',
-                            'activationId',
-                            'pluginId',
-                            'commandName',
-                            'trigger',
-                          ],
-                          type: 'object',
-                        },
-                        {
-                          properties: {
-                            kind: {
-                              const: 'injection',
-                              type: 'string',
-                            },
-                            variant: {
-                              type: 'string',
-                            },
-                          },
-                          required: [
-                            'kind',
-                            'variant',
-                          ],
-                          type: 'object',
-                        },
-                        {
-                          properties: {
-                            isError: {
-                              type: 'boolean',
-                            },
-                            kind: {
-                              const: 'shell_command',
-                              type: 'string',
-                            },
-                            phase: {
-                              enum: [
-                                'input',
-                                'output',
+                            {
+                              properties: {
+                                kind: {
+                                  const: 'retry',
+                                  type: 'string',
+                                },
+                              },
+                              required: [
+                                'kind',
                               ],
-                              type: 'string',
+                              type: 'object',
                             },
-                          },
-                          required: [
-                            'kind',
-                            'phase',
-                          ],
-                          type: 'object',
-                        },
-                        {
-                          properties: {
-                            kind: {
-                              const: 'compaction_summary',
-                              type: 'string',
-                            },
-                          },
-                          required: [
-                            'kind',
-                          ],
-                          type: 'object',
-                        },
-                        {
-                          properties: {
-                            kind: {
-                              const: 'system_trigger',
-                              type: 'string',
-                            },
-                            name: {
-                              type: 'string',
-                            },
-                          },
-                          required: [
-                            'kind',
-                            'name',
-                          ],
-                          type: 'object',
-                        },
-                        {
-                          properties: {
-                            kind: {
-                              const: 'task',
-                              type: 'string',
-                            },
-                            notificationId: {
-                              type: 'string',
-                            },
-                            status: {
-                              enum: [
-                                'running',
-                                'completed',
-                                'failed',
-                                'timed_out',
-                                'killed',
-                                'lost',
+                            {
+                              properties: {
+                                kind: {
+                                  const: 'system',
+                                  type: 'string',
+                                },
+                              },
+                              required: [
+                                'kind',
                               ],
-                              type: 'string',
+                              type: 'object',
                             },
-                            taskId: {
-                              type: 'string',
-                            },
-                          },
-                          required: [
-                            'kind',
-                            'taskId',
-                            'status',
-                            'notificationId',
                           ],
-                          type: 'object',
                         },
-                        {
-                          properties: {
-                            kind: {
-                              const: 'background_task',
-                              type: 'string',
-                            },
-                            notificationId: {
-                              type: 'string',
-                            },
-                            status: {
-                              enum: [
-                                'running',
-                                'completed',
-                                'failed',
-                                'timed_out',
-                                'killed',
-                                'lost',
-                              ],
-                              type: 'string',
-                            },
-                            taskId: {
-                              type: 'string',
-                            },
-                          },
-                          required: [
-                            'kind',
-                            'taskId',
-                            'status',
-                            'notificationId',
+                        outcome: {
+                          enum: [
+                            'completed',
+                            'interrupted',
+                            'failed',
                           ],
-                          type: 'object',
+                          type: 'string',
                         },
-                        {
-                          properties: {
-                            coalescedCount: {
-                              type: 'number',
-                            },
-                            cron: {
-                              type: 'string',
-                            },
-                            jobId: {
-                              type: 'string',
-                            },
-                            kind: {
-                              const: 'cron_job',
-                              type: 'string',
-                            },
-                            recurring: {
-                              type: 'boolean',
-                            },
-                            stale: {
-                              type: 'boolean',
-                            },
-                          },
-                          required: [
-                            'kind',
-                            'jobId',
-                            'cron',
-                            'recurring',
-                            'coalescedCount',
-                            'stale',
+                        placement: {
+                          enum: [
+                            'opener',
+                            'steer',
                           ],
-                          type: 'object',
+                          type: 'string',
                         },
-                        {
-                          properties: {
-                            count: {
-                              type: 'number',
-                            },
-                            kind: {
-                              const: 'cron_missed',
-                              type: 'string',
-                            },
+                        prompt_ids: {
+                          items: {
+                            minLength: 1,
+                            type: 'string',
                           },
-                          required: [
-                            'kind',
-                            'count',
-                          ],
-                          type: 'object',
+                          type: 'array',
                         },
-                        {
-                          properties: {
-                            blocked: {
-                              type: 'boolean',
-                            },
-                            event: {
-                              type: 'string',
-                            },
-                            kind: {
-                              const: 'hook_result',
-                              type: 'string',
-                            },
-                          },
-                          required: [
-                            'kind',
-                            'event',
-                          ],
-                          type: 'object',
-                        },
-                        {
-                          properties: {
-                            kind: {
-                              const: 'retry',
-                              type: 'string',
-                            },
-                            trigger: {
-                              type: 'string',
-                            },
-                          },
-                          required: [
-                            'kind',
-                          ],
-                          type: 'object',
-                        },
-                      ],
-                    },
-                    prompt: {
-                      type: 'string',
-                    },
-                    promptAttachments: {
-                      items: {
-                        anyOf: [
-                          {
+                        skills: {
+                          items: {
                             properties: {
-                              fileId: {
+                              args: {
+                                type: 'string',
+                              },
+                              name: {
+                                type: 'string',
+                              },
+                              path: {
+                                type: 'string',
+                              },
+                            },
+                            required: [
+                              'name',
+                            ],
+                            type: 'object',
+                          },
+                          type: 'array',
+                        },
+                        status: {
+                          enum: [
+                            'running',
+                            'ended',
+                          ],
+                          type: 'string',
+                        },
+                        step_index: {
+                          exclusiveMinimum: 0,
+                          maximum: 9007199254740991,
+                          type: 'integer',
+                        },
+                        text: {
+                          type: 'string',
+                        },
+                        type: {
+                          const: 'user_message',
+                          type: 'string',
+                        },
+                      },
+                      required: [
+                        'type',
+                        'item_id',
+                        'status',
+                        'created_at',
+                        'prompt_ids',
+                        'placement',
+                        'origin',
+                        'text',
+                        'attachments',
+                        'skills',
+                      ],
+                      type: 'object',
+                    },
+                    {
+                      properties: {
+                        created_at: {
+                          type: 'string',
+                        },
+                        debug: {
+                          properties: {
+                            finish_reason: {
+                              type: 'string',
+                            },
+                            timing: {
+                              properties: {
+                                client_blocked_ms: {
+                                  type: 'number',
+                                },
+                                client_consume_ms: {
+                                  type: 'number',
+                                },
+                                first_token_ms: {
+                                  type: 'number',
+                                },
+                                request_build_ms: {
+                                  type: 'number',
+                                },
+                                server_decode_ms: {
+                                  type: 'number',
+                                },
+                                server_first_token_ms: {
+                                  type: 'number',
+                                },
+                                stream_ms: {
+                                  type: 'number',
+                                },
+                              },
+                              type: 'object',
+                            },
+                            usage: {
+                              properties: {
+                                input_cache_creation: {
+                                  minimum: 0,
+                                  type: 'number',
+                                },
+                                input_cache_read: {
+                                  minimum: 0,
+                                  type: 'number',
+                                },
+                                input_other: {
+                                  minimum: 0,
+                                  type: 'number',
+                                },
+                                output: {
+                                  minimum: 0,
+                                  type: 'number',
+                                },
+                              },
+                              required: [
+                                'input_other',
+                                'output',
+                                'input_cache_read',
+                                'input_cache_creation',
+                              ],
+                              type: 'object',
+                            },
+                          },
+                          type: 'object',
+                        },
+                        item_id: {
+                          minLength: 1,
+                          type: 'string',
+                        },
+                        outcome: {
+                          enum: [
+                            'completed',
+                            'interrupted',
+                            'failed',
+                          ],
+                          type: 'string',
+                        },
+                        status: {
+                          enum: [
+                            'running',
+                            'ended',
+                          ],
+                          type: 'string',
+                        },
+                        step_index: {
+                          exclusiveMinimum: 0,
+                          maximum: 9007199254740991,
+                          type: 'integer',
+                        },
+                        text: {
+                          type: 'string',
+                        },
+                        type: {
+                          const: 'assistant_message',
+                          type: 'string',
+                        },
+                      },
+                      required: [
+                        'type',
+                        'item_id',
+                        'status',
+                        'created_at',
+                        'text',
+                      ],
+                      type: 'object',
+                    },
+                    {
+                      properties: {
+                        created_at: {
+                          type: 'string',
+                        },
+                        debug: {
+                          properties: {
+                            finish_reason: {
+                              type: 'string',
+                            },
+                            timing: {
+                              properties: {
+                                client_blocked_ms: {
+                                  type: 'number',
+                                },
+                                client_consume_ms: {
+                                  type: 'number',
+                                },
+                                first_token_ms: {
+                                  type: 'number',
+                                },
+                                request_build_ms: {
+                                  type: 'number',
+                                },
+                                server_decode_ms: {
+                                  type: 'number',
+                                },
+                                server_first_token_ms: {
+                                  type: 'number',
+                                },
+                                stream_ms: {
+                                  type: 'number',
+                                },
+                              },
+                              type: 'object',
+                            },
+                            usage: {
+                              properties: {
+                                input_cache_creation: {
+                                  minimum: 0,
+                                  type: 'number',
+                                },
+                                input_cache_read: {
+                                  minimum: 0,
+                                  type: 'number',
+                                },
+                                input_other: {
+                                  minimum: 0,
+                                  type: 'number',
+                                },
+                                output: {
+                                  minimum: 0,
+                                  type: 'number',
+                                },
+                              },
+                              required: [
+                                'input_other',
+                                'output',
+                                'input_cache_read',
+                                'input_cache_creation',
+                              ],
+                              type: 'object',
+                            },
+                          },
+                          type: 'object',
+                        },
+                        duration_ms: {
+                          maximum: 9007199254740991,
+                          minimum: 0,
+                          type: 'integer',
+                        },
+                        item_id: {
+                          minLength: 1,
+                          type: 'string',
+                        },
+                        outcome: {
+                          enum: [
+                            'completed',
+                            'interrupted',
+                            'failed',
+                          ],
+                          type: 'string',
+                        },
+                        started_at: {
+                          type: 'string',
+                        },
+                        status: {
+                          enum: [
+                            'running',
+                            'ended',
+                          ],
+                          type: 'string',
+                        },
+                        step_index: {
+                          exclusiveMinimum: 0,
+                          maximum: 9007199254740991,
+                          type: 'integer',
+                        },
+                        text: {
+                          type: 'string',
+                        },
+                        type: {
+                          const: 'reasoning',
+                          type: 'string',
+                        },
+                      },
+                      required: [
+                        'type',
+                        'item_id',
+                        'status',
+                        'created_at',
+                        'text',
+                        'started_at',
+                      ],
+                      type: 'object',
+                    },
+                    {
+                      properties: {
+                        agent_refs: {
+                          items: {
+                            properties: {
+                              agent_id: {
+                                minLength: 1,
+                                type: 'string',
+                              },
+                              role: {
+                                enum: [
+                                  'child',
+                                  'member',
+                                ],
+                                type: 'string',
+                              },
+                              swarm_index: {
+                                maximum: 9007199254740991,
+                                minimum: 0,
+                                type: 'integer',
+                              },
+                              task_id: {
+                                type: 'string',
+                              },
+                            },
+                            required: [
+                              'agent_id',
+                              'role',
+                            ],
+                            type: 'object',
+                          },
+                          type: 'array',
+                        },
+                        created_at: {
+                          type: 'string',
+                        },
+                        debug: {
+                          properties: {
+                            finish_reason: {
+                              type: 'string',
+                            },
+                            timing: {
+                              properties: {
+                                client_blocked_ms: {
+                                  type: 'number',
+                                },
+                                client_consume_ms: {
+                                  type: 'number',
+                                },
+                                first_token_ms: {
+                                  type: 'number',
+                                },
+                                request_build_ms: {
+                                  type: 'number',
+                                },
+                                server_decode_ms: {
+                                  type: 'number',
+                                },
+                                server_first_token_ms: {
+                                  type: 'number',
+                                },
+                                stream_ms: {
+                                  type: 'number',
+                                },
+                              },
+                              type: 'object',
+                            },
+                            usage: {
+                              properties: {
+                                input_cache_creation: {
+                                  minimum: 0,
+                                  type: 'number',
+                                },
+                                input_cache_read: {
+                                  minimum: 0,
+                                  type: 'number',
+                                },
+                                input_other: {
+                                  minimum: 0,
+                                  type: 'number',
+                                },
+                                output: {
+                                  minimum: 0,
+                                  type: 'number',
+                                },
+                              },
+                              required: [
+                                'input_other',
+                                'output',
+                                'input_cache_read',
+                                'input_cache_creation',
+                              ],
+                              type: 'object',
+                            },
+                          },
+                          type: 'object',
+                        },
+                        display: {},
+                        ended_at: {
+                          type: 'string',
+                        },
+                        error: {
+                          type: 'string',
+                        },
+                        fields: {
+                          additionalProperties: {},
+                          propertyNames: {
+                            type: 'string',
+                          },
+                          type: 'object',
+                        },
+                        input: {},
+                        input_text: {
+                          type: 'string',
+                        },
+                        interaction_id: {
+                          type: 'string',
+                        },
+                        item_id: {
+                          minLength: 1,
+                          type: 'string',
+                        },
+                        media: {
+                          items: {
+                            properties: {
+                              file_id: {
                                 type: 'string',
                               },
                               kind: {
@@ -2729,4090 +4570,830 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                                 ],
                                 type: 'string',
                               },
-                            },
-                            required: [
-                              'kind',
-                              'fileId',
-                            ],
-                            type: 'object',
-                          },
-                          {
-                            properties: {
-                              kind: {
-                                const: 'file',
+                              media_type: {
                                 type: 'string',
                               },
-                              mediaType: {
+                              url: {
                                 type: 'string',
-                              },
-                              name: {
-                                type: 'string',
-                              },
-                              path: {
-                                type: 'string',
-                              },
-                              size: {
-                                type: 'number',
                               },
                             },
                             required: [
                               'kind',
-                              'name',
-                              'mediaType',
-                              'size',
-                              'path',
                             ],
                             type: 'object',
                           },
-                        ],
-                      },
-                      type: 'array',
-                    },
-                    promptId: {
-                      type: 'string',
-                    },
-                    turnId: {
-                      type: 'number',
-                    },
-                    type: {
-                      const: 'turn.started',
-                      type: 'string',
-                    },
-                  },
-                  required: [
-                    'type',
-                    'agentId',
-                    'turnId',
-                    'origin',
-                  ],
-                  type: 'object',
-                },
-                {
-                  properties: {
-                    agentId: {
-                      type: 'string',
-                    },
-                    durationMs: {
-                      type: 'number',
-                    },
-                    error: {
-                      properties: {
-                        cause: {
-                          $ref: '#/definitions/__schema0',
-                        },
-                        code: {
-                          enum: [
-                            'config.invalid',
-                            'session.not_found',
-                            'session.already_exists',
-                            'session.id_invalid',
-                            'session.id_required',
-                            'session.id_empty',
-                            'session.title_empty',
-                            'session.state_not_found',
-                            'session.state_invalid',
-                            'session.fork_active_turn',
-                            'session.undo_unavailable',
-                            'session.export_not_found',
-                            'session.export_missing_version',
-                            'session.export_output_conflict',
-                            'session.export_too_large',
-                            'session.closed',
-                            'session.permission_mode_invalid',
-                            'session.thinking_empty',
-                            'session.model_empty',
-                            'session.plan_mode_invalid',
-                            'session.approval_handler_error',
-                            'session.question_handler_error',
-                            'session.init_failed',
-                            'agent.not_found',
-                            'agent.already_exists',
-                            'agent.already_running',
-                            'agent.not_a_subagent',
-                            'agent.not_owned',
-                            'agent.type_not_allowed',
-                            'agent.max_tokens_exceeded',
-                            'activity.agent_busy',
-                            'activity.cancelling',
-                            'activity.disposing',
-                            'activity.disposed',
-                            'activity.initializing',
-                            'activity.session_rejected',
-                            'turn.agent_busy',
-                            'goal.already_exists',
-                            'goal.not_found',
-                            'goal.objective_empty',
-                            'goal.objective_too_long',
-                            'goal.status_invalid',
-                            'goal.metadata_reserved',
-                            'goal.not_resumable',
-                            'goal.unsupported_agent',
-                            'model.not_configured',
-                            'model.config_invalid',
-                            'profile.thinking_alias_conflict',
-                            'model.not_found',
-                            'auth.login_required',
-                            'auth.provisioning_required',
-                            'auth.token_missing',
-                            'auth.token_unauthorized',
-                            'auth.model_not_resolved',
-                            'context.overflow',
-                            'loop.max_steps_exceeded',
-                            'provider.api_error',
-                            'provider.filtered',
-                            'provider.rate_limit',
-                            'provider.auth_error',
-                            'provider.connection_error',
-                            'provider.overloaded',
-                            'provider.not_found',
-                            'skill.not_found',
-                            'skill.type_unsupported',
-                            'skill.name_empty',
-                            'skill.parse_failed',
-                            'skill.nested_too_deep',
-                            'records.write_failed',
-                            'compaction.failed',
-                            'compaction.unable',
-                            'task.task_id_empty',
-                            'task.limit_exceeded',
-                            'usage.turn_id_conflict',
-                            'mcp.server_not_found',
-                            'mcp.server_disabled',
-                            'mcp.startup_failed',
-                            'mcp.tool_name_collision',
-                            'mcp.oauth_failed',
-                            'message.not_found',
-                            'plugin.not_found',
-                            'plugin.load_failed',
-                            'request.invalid',
-                            'request.work_dir_required',
-                            'request.prompt_input_empty',
-                            'prompt.id_conflict',
-                            'prompt.not_found',
-                            'prompt.already_completed',
-                            'session.busy',
-                            'shell.git_bash_not_found',
-                            'workspace.not_found',
-                            'terminal.not_found',
-                            'file.not_found',
-                            'file.too_large',
-                            'fs.path_not_found',
-                            'fs.permission_denied',
-                            'fs.path_escapes',
-                            'fs.is_directory',
-                            'fs.is_binary',
-                            'fs.too_large',
-                            'fs.already_exists',
-                            'fs.too_many_results',
-                            'fs.grep_timeout',
-                            'fs.git_unavailable',
-                            'wire.migration_missing',
-                            'storage.permission_denied',
-                            'storage.disk_full',
-                            'cron.expression_invalid',
-                            'web.invalid_url',
-                            'web.private_address',
-                            'web.fetch_failed',
-                            'validation.failed',
-                            'not_implemented',
-                            'internal',
-                          ],
-                          type: 'string',
-                        },
-                        details: {
-                          additionalProperties: {},
-                          propertyNames: {
-                            type: 'string',
-                          },
-                          type: 'object',
-                        },
-                        message: {
-                          type: 'string',
+                          type: 'array',
                         },
                         name: {
                           type: 'string',
                         },
-                        retryable: {
-                          type: 'boolean',
+                        note: {
+                          type: 'string',
                         },
-                      },
-                      required: [
-                        'code',
-                        'message',
-                        'retryable',
-                      ],
-                      type: 'object',
-                    },
-                    interruptReason: {
-                      enum: [
-                        'user_cancelled',
-                        'aborted',
-                        'max_steps',
-                        'error',
-                        'filtered',
-                        'blocked',
-                      ],
-                      type: 'string',
-                    },
-                    reason: {
-                      enum: [
-                        'completed',
-                        'cancelled',
-                        'failed',
-                        'blocked',
-                      ],
-                      type: 'string',
-                    },
-                    time: {
-                      type: 'number',
-                    },
-                    turnId: {
-                      type: 'number',
-                    },
-                    type: {
-                      const: 'turn.ended',
-                      type: 'string',
-                    },
-                  },
-                  required: [
-                    'type',
-                    'agentId',
-                    'turnId',
-                    'reason',
-                  ],
-                  type: 'object',
-                },
-                {
-                  properties: {
-                    agentId: {
-                      type: 'string',
-                    },
-                    step: {
-                      type: 'number',
-                    },
-                    stepId: {
-                      type: 'string',
-                    },
-                    turnId: {
-                      type: 'number',
-                    },
-                    type: {
-                      const: 'turn.step.started',
-                      type: 'string',
-                    },
-                  },
-                  required: [
-                    'type',
-                    'agentId',
-                    'turnId',
-                    'step',
-                  ],
-                  type: 'object',
-                },
-                {
-                  properties: {
-                    agentId: {
-                      type: 'string',
-                    },
-                    finishReason: {
-                      type: 'string',
-                    },
-                    llmClientConsumeMs: {
-                      type: 'number',
-                    },
-                    llmFirstTokenLatencyMs: {
-                      type: 'number',
-                    },
-                    llmRequestBuildMs: {
-                      type: 'number',
-                    },
-                    llmServerDecodeMs: {
-                      type: 'number',
-                    },
-                    llmServerFirstTokenMs: {
-                      type: 'number',
-                    },
-                    llmStreamDurationMs: {
-                      type: 'number',
-                    },
-                    providerFinishReason: {
-                      enum: [
-                        'completed',
-                        'tool_calls',
-                        'truncated',
-                        'filtered',
-                        'paused',
-                        'other',
-                      ],
-                      type: 'string',
-                    },
-                    rawFinishReason: {
-                      type: 'string',
-                    },
-                    step: {
-                      type: 'number',
-                    },
-                    stepId: {
-                      type: 'string',
-                    },
-                    turnId: {
-                      type: 'number',
-                    },
-                    type: {
-                      const: 'turn.step.completed',
-                      type: 'string',
-                    },
-                    usage: {
-                      properties: {
-                        inputCacheCreation: {
-                          type: 'number',
-                        },
-                        inputCacheRead: {
-                          type: 'number',
-                        },
-                        inputOther: {
-                          type: 'number',
+                        outcome: {
+                          enum: [
+                            'completed',
+                            'interrupted',
+                            'failed',
+                          ],
+                          type: 'string',
                         },
                         output: {
-                          type: 'number',
-                        },
-                      },
-                      required: [
-                        'inputOther',
-                        'output',
-                        'inputCacheRead',
-                        'inputCacheCreation',
-                      ],
-                      type: 'object',
-                    },
-                  },
-                  required: [
-                    'type',
-                    'agentId',
-                    'turnId',
-                    'step',
-                  ],
-                  type: 'object',
-                },
-                {
-                  properties: {
-                    agentId: {
-                      type: 'string',
-                    },
-                    delayMs: {
-                      type: 'number',
-                    },
-                    errorMessage: {
-                      type: 'string',
-                    },
-                    errorName: {
-                      type: 'string',
-                    },
-                    failedAttempt: {
-                      type: 'number',
-                    },
-                    maxAttempts: {
-                      type: 'number',
-                    },
-                    nextAttempt: {
-                      type: 'number',
-                    },
-                    statusCode: {
-                      type: 'number',
-                    },
-                    step: {
-                      type: 'number',
-                    },
-                    stepId: {
-                      type: 'string',
-                    },
-                    turnId: {
-                      type: 'number',
-                    },
-                    type: {
-                      const: 'turn.step.retrying',
-                      type: 'string',
-                    },
-                  },
-                  required: [
-                    'type',
-                    'agentId',
-                    'turnId',
-                    'step',
-                    'failedAttempt',
-                    'nextAttempt',
-                    'maxAttempts',
-                    'delayMs',
-                    'errorName',
-                    'errorMessage',
-                  ],
-                  type: 'object',
-                },
-                {
-                  properties: {
-                    agentId: {
-                      type: 'string',
-                    },
-                    message: {
-                      type: 'string',
-                    },
-                    reason: {
-                      type: 'string',
-                    },
-                    step: {
-                      type: 'number',
-                    },
-                    stepId: {
-                      type: 'string',
-                    },
-                    turnId: {
-                      type: 'number',
-                    },
-                    type: {
-                      const: 'turn.step.interrupted',
-                      type: 'string',
-                    },
-                  },
-                  required: [
-                    'type',
-                    'agentId',
-                    'turnId',
-                    'step',
-                    'reason',
-                  ],
-                  type: 'object',
-                },
-                {
-                  properties: {
-                    agentId: {
-                      type: 'string',
-                    },
-                    delta: {
-                      type: 'string',
-                    },
-                    turnId: {
-                      type: 'number',
-                    },
-                    type: {
-                      const: 'assistant.delta',
-                      type: 'string',
-                    },
-                  },
-                  required: [
-                    'type',
-                    'agentId',
-                    'turnId',
-                    'delta',
-                  ],
-                  type: 'object',
-                },
-                {
-                  properties: {
-                    agentId: {
-                      type: 'string',
-                    },
-                    blocked: {
-                      type: 'boolean',
-                    },
-                    content: {
-                      type: 'string',
-                    },
-                    hookEvent: {
-                      type: 'string',
-                    },
-                    turnId: {
-                      type: 'number',
-                    },
-                    type: {
-                      const: 'hook.result',
-                      type: 'string',
-                    },
-                  },
-                  required: [
-                    'type',
-                    'agentId',
-                    'hookEvent',
-                    'content',
-                  ],
-                  type: 'object',
-                },
-                {
-                  properties: {
-                    agentId: {
-                      type: 'string',
-                    },
-                    delta: {
-                      type: 'string',
-                    },
-                    turnId: {
-                      type: 'number',
-                    },
-                    type: {
-                      const: 'thinking.delta',
-                      type: 'string',
-                    },
-                  },
-                  required: [
-                    'type',
-                    'agentId',
-                    'turnId',
-                    'delta',
-                  ],
-                  type: 'object',
-                },
-                {
-                  properties: {
-                    agentId: {
-                      type: 'string',
-                    },
-                    argumentsPart: {
-                      type: 'string',
-                    },
-                    name: {
-                      type: 'string',
-                    },
-                    toolCallId: {
-                      type: 'string',
-                    },
-                    turnId: {
-                      type: 'number',
-                    },
-                    type: {
-                      const: 'tool.call.delta',
-                      type: 'string',
-                    },
-                  },
-                  required: [
-                    'type',
-                    'agentId',
-                    'turnId',
-                    'toolCallId',
-                  ],
-                  type: 'object',
-                },
-                {
-                  properties: {
-                    agentId: {
-                      type: 'string',
-                    },
-                    args: {},
-                    description: {
-                      type: 'string',
-                    },
-                    display: {
-                      oneOf: [
-                        {
-                          properties: {
-                            command: {
-                              type: 'string',
-                            },
-                            cwd: {
-                              type: 'string',
-                            },
-                            description: {
-                              type: 'string',
-                            },
-                            kind: {
-                              const: 'command',
-                              type: 'string',
-                            },
-                            language: {
-                              const: 'bash',
-                              type: 'string',
-                            },
-                          },
-                          required: [
-                            'kind',
-                            'command',
-                          ],
-                          type: 'object',
-                        },
-                        {
-                          properties: {
-                            after: {
-                              type: 'string',
-                            },
-                            before: {
-                              type: 'string',
-                            },
-                            content: {
-                              type: 'string',
-                            },
-                            detail: {
-                              type: 'string',
-                            },
-                            kind: {
-                              const: 'file_io',
-                              type: 'string',
-                            },
-                            operation: {
-                              enum: [
-                                'read',
-                                'write',
-                                'edit',
-                                'glob',
-                                'grep',
-                              ],
-                              type: 'string',
-                            },
-                            path: {
-                              type: 'string',
-                            },
-                          },
-                          required: [
-                            'kind',
-                            'operation',
-                            'path',
-                          ],
-                          type: 'object',
-                        },
-                        {
-                          properties: {
-                            after: {
-                              type: 'string',
-                            },
-                            before: {
-                              type: 'string',
-                            },
-                            hunks: {
-                              type: 'number',
-                            },
-                            kind: {
-                              const: 'diff',
-                              type: 'string',
-                            },
-                            path: {
-                              type: 'string',
-                            },
-                          },
-                          required: [
-                            'kind',
-                            'path',
-                            'before',
-                            'after',
-                          ],
-                          type: 'object',
-                        },
-                        {
-                          properties: {
-                            kind: {
-                              const: 'search',
-                              type: 'string',
-                            },
-                            query: {
-                              type: 'string',
-                            },
-                            scope: {
-                              type: 'string',
-                            },
-                          },
-                          required: [
-                            'kind',
-                            'query',
-                          ],
-                          type: 'object',
-                        },
-                        {
-                          properties: {
-                            kind: {
-                              const: 'url_fetch',
-                              type: 'string',
-                            },
-                            method: {
-                              type: 'string',
-                            },
-                            url: {
-                              type: 'string',
-                            },
-                          },
-                          required: [
-                            'kind',
-                            'url',
-                          ],
-                          type: 'object',
-                        },
-                        {
-                          properties: {
-                            agent_name: {
-                              type: 'string',
-                            },
-                            background: {
-                              type: 'boolean',
-                            },
-                            kind: {
-                              const: 'agent_call',
-                              type: 'string',
-                            },
-                            prompt: {
-                              type: 'string',
-                            },
-                          },
-                          required: [
-                            'kind',
-                            'agent_name',
-                            'prompt',
-                          ],
-                          type: 'object',
-                        },
-                        {
-                          properties: {
-                            args: {
-                              type: 'string',
-                            },
-                            kind: {
-                              const: 'skill_call',
-                              type: 'string',
-                            },
-                            skill_name: {
-                              type: 'string',
-                            },
-                          },
-                          required: [
-                            'kind',
-                            'skill_name',
-                          ],
-                          type: 'object',
-                        },
-                        {
-                          properties: {
-                            items: {
-                              items: {
-                                properties: {
-                                  status: {
-                                    type: 'string',
-                                  },
-                                  title: {
-                                    type: 'string',
-                                  },
-                                },
-                                required: [
-                                  'title',
-                                  'status',
-                                ],
-                                type: 'object',
-                              },
-                              type: 'array',
-                            },
-                            kind: {
-                              const: 'todo_list',
-                              type: 'string',
-                            },
-                          },
-                          required: [
-                            'kind',
-                            'items',
-                          ],
-                          type: 'object',
-                        },
-                        {
-                          properties: {
-                            description: {
-                              type: 'string',
-                            },
-                            kind: {
-                              const: 'task',
-                              type: 'string',
-                            },
-                            status: {
-                              type: 'string',
-                            },
-                            task_id: {
-                              type: 'string',
-                            },
-                            task_kind: {
-                              type: 'string',
-                            },
-                          },
-                          required: [
-                            'kind',
-                            'task_id',
-                            'status',
-                            'description',
-                          ],
-                          type: 'object',
-                        },
-                        {
-                          properties: {
-                            kind: {
-                              const: 'task_stop',
-                              type: 'string',
-                            },
-                            task_description: {
-                              type: 'string',
-                            },
-                            task_id: {
-                              type: 'string',
-                            },
-                          },
-                          required: [
-                            'kind',
-                            'task_id',
-                            'task_description',
-                          ],
-                          type: 'object',
-                        },
-                        {
-                          properties: {
-                            kind: {
-                              const: 'plan_review',
-                              type: 'string',
-                            },
-                            options: {
-                              items: {
-                                properties: {
-                                  description: {
-                                    type: 'string',
-                                  },
-                                  label: {
-                                    type: 'string',
-                                  },
-                                },
-                                required: [
-                                  'label',
-                                  'description',
-                                ],
-                                type: 'object',
-                              },
-                              readOnly: true,
-                              type: 'array',
-                            },
-                            path: {
-                              type: 'string',
-                            },
-                            plan: {
-                              type: 'string',
-                            },
-                          },
-                          required: [
-                            'kind',
-                            'plan',
-                          ],
-                          type: 'object',
-                        },
-                        {
-                          properties: {
-                            completionCriterion: {
-                              type: 'string',
-                            },
-                            kind: {
-                              const: 'goal_start',
-                              type: 'string',
-                            },
-                            mode: {
-                              enum: [
-                                'manual',
-                                'yolo',
-                              ],
-                              type: 'string',
-                            },
-                            objective: {
-                              type: 'string',
-                            },
-                          },
-                          required: [
-                            'kind',
-                            'objective',
-                            'mode',
-                          ],
-                          type: 'object',
-                        },
-                        {
-                          properties: {
-                            detail: {},
-                            kind: {
-                              const: 'generic',
-                              type: 'string',
-                            },
-                            summary: {
-                              type: 'string',
-                            },
-                          },
-                          required: [
-                            'kind',
-                            'summary',
-                          ],
-                          type: 'object',
-                        },
-                      ],
-                    },
-                    name: {
-                      type: 'string',
-                    },
-                    toolCallId: {
-                      type: 'string',
-                    },
-                    turnId: {
-                      type: 'number',
-                    },
-                    type: {
-                      const: 'tool.call.started',
-                      type: 'string',
-                    },
-                  },
-                  required: [
-                    'type',
-                    'agentId',
-                    'turnId',
-                    'toolCallId',
-                    'name',
-                    'args',
-                  ],
-                  type: 'object',
-                },
-                {
-                  properties: {
-                    agentId: {
-                      type: 'string',
-                    },
-                    toolCallId: {
-                      type: 'string',
-                    },
-                    turnId: {
-                      type: 'number',
-                    },
-                    type: {
-                      const: 'tool.progress',
-                      type: 'string',
-                    },
-                    update: {
-                      properties: {
-                        customData: {},
-                        customKind: {
                           type: 'string',
                         },
-                        kind: {
+                        stage: {
                           enum: [
-                            'stdout',
-                            'stderr',
-                            'progress',
-                            'status',
-                            'custom',
+                            'input',
+                            'awaiting_approval',
+                            'executing',
                           ],
                           type: 'string',
                         },
-                        percent: {
-                          type: 'number',
-                        },
-                        replace: {
-                          type: 'boolean',
-                        },
-                        text: {
-                          type: 'string',
-                        },
-                      },
-                      required: [
-                        'kind',
-                      ],
-                      type: 'object',
-                    },
-                  },
-                  required: [
-                    'type',
-                    'agentId',
-                    'turnId',
-                    'toolCallId',
-                    'update',
-                  ],
-                  type: 'object',
-                },
-                {
-                  properties: {
-                    agentId: {
-                      type: 'string',
-                    },
-                    commandId: {
-                      type: 'string',
-                    },
-                    taskId: {
-                      type: 'string',
-                    },
-                    type: {
-                      const: 'shell.output',
-                      type: 'string',
-                    },
-                    update: {
-                      properties: {
-                        customData: {},
-                        customKind: {
-                          type: 'string',
-                        },
-                        kind: {
-                          enum: [
-                            'stdout',
-                            'stderr',
-                            'progress',
-                            'status',
-                            'custom',
-                          ],
-                          type: 'string',
-                        },
-                        percent: {
-                          type: 'number',
-                        },
-                        replace: {
-                          type: 'boolean',
-                        },
-                        text: {
-                          type: 'string',
-                        },
-                      },
-                      required: [
-                        'kind',
-                      ],
-                      type: 'object',
-                    },
-                  },
-                  required: [
-                    'type',
-                    'agentId',
-                    'commandId',
-                    'update',
-                  ],
-                  type: 'object',
-                },
-                {
-                  properties: {
-                    agentId: {
-                      type: 'string',
-                    },
-                    commandId: {
-                      type: 'string',
-                    },
-                    taskId: {
-                      type: 'string',
-                    },
-                    type: {
-                      const: 'shell.started',
-                      type: 'string',
-                    },
-                  },
-                  required: [
-                    'type',
-                    'agentId',
-                    'commandId',
-                    'taskId',
-                  ],
-                  type: 'object',
-                },
-                {
-                  properties: {
-                    agentId: {
-                      type: 'string',
-                    },
-                    commandId: {
-                      type: 'string',
-                    },
-                    isError: {
-                      type: 'boolean',
-                    },
-                    taskId: {
-                      type: 'string',
-                    },
-                    type: {
-                      const: 'shell.completed',
-                      type: 'string',
-                    },
-                  },
-                  required: [
-                    'type',
-                    'agentId',
-                    'commandId',
-                    'isError',
-                  ],
-                  type: 'object',
-                },
-                {
-                  properties: {
-                    agentId: {
-                      type: 'string',
-                    },
-                    isError: {
-                      type: 'boolean',
-                    },
-                    output: {},
-                    synthetic: {
-                      type: 'boolean',
-                    },
-                    toolCallId: {
-                      type: 'string',
-                    },
-                    turnId: {
-                      type: 'number',
-                    },
-                    type: {
-                      const: 'tool.result',
-                      type: 'string',
-                    },
-                  },
-                  required: [
-                    'type',
-                    'agentId',
-                    'turnId',
-                    'toolCallId',
-                    'output',
-                  ],
-                  type: 'object',
-                },
-                {
-                  properties: {
-                    agentId: {
-                      type: 'string',
-                    },
-                    reason: {
-                      enum: [
-                        'mcp.connected',
-                        'mcp.disconnected',
-                        'mcp.failed',
-                      ],
-                      type: 'string',
-                    },
-                    serverName: {
-                      type: 'string',
-                    },
-                    type: {
-                      const: 'tool.list.updated',
-                      type: 'string',
-                    },
-                  },
-                  required: [
-                    'type',
-                    'agentId',
-                    'reason',
-                    'serverName',
-                  ],
-                  type: 'object',
-                },
-                {
-                  properties: {
-                    agentId: {
-                      type: 'string',
-                    },
-                    server: {
-                      properties: {
-                        error: {
-                          type: 'string',
-                        },
-                        name: {
+                        started_at: {
                           type: 'string',
                         },
                         status: {
                           enum: [
-                            'pending',
-                            'connected',
-                            'failed',
-                            'disabled',
-                            'needs-auth',
-                            'removed',
+                            'running',
+                            'ended',
                           ],
                           type: 'string',
                         },
-                        toolCount: {
-                          type: 'number',
+                        step_index: {
+                          exclusiveMinimum: 0,
+                          maximum: 9007199254740991,
+                          type: 'integer',
                         },
-                        transport: {
-                          enum: [
-                            'stdio',
-                            'http',
-                          ],
+                        task_id: {
+                          type: 'string',
+                        },
+                        type: {
+                          const: 'tool_call',
                           type: 'string',
                         },
                       },
                       required: [
-                        'name',
-                        'transport',
+                        'type',
+                        'item_id',
                         'status',
-                        'toolCount',
+                        'created_at',
+                        'name',
+                        'started_at',
                       ],
                       type: 'object',
                     },
-                    type: {
-                      const: 'mcp.server.status',
-                      type: 'string',
-                    },
-                  },
-                  required: [
-                    'type',
-                    'agentId',
-                    'server',
-                  ],
-                  type: 'object',
-                },
-                {
-                  properties: {
-                    callerAgentId: {
-                      type: 'string',
-                    },
-                    description: {
-                      type: 'string',
-                    },
-                    model: {
-                      type: 'string',
-                    },
-                    parentAgentId: {
-                      type: 'string',
-                    },
-                    parentToolCallId: {
-                      type: 'string',
-                    },
-                    parentToolCallUuid: {
-                      type: 'string',
-                    },
-                    runInBackground: {
-                      type: 'boolean',
-                    },
-                    subagentId: {
-                      type: 'string',
-                    },
-                    subagentName: {
-                      type: 'string',
-                    },
-                    swarmIndex: {
-                      type: 'number',
-                    },
-                    taskId: {
-                      type: 'string',
-                    },
-                    thinkingEffort: {
-                      type: 'string',
-                    },
-                    type: {
-                      const: 'subagent.spawned',
-                      type: 'string',
-                    },
-                  },
-                  required: [
-                    'type',
-                    'subagentId',
-                    'subagentName',
-                    'parentToolCallId',
-                    'runInBackground',
-                  ],
-                  type: 'object',
-                },
-                {
-                  properties: {
-                    subagentId: {
-                      type: 'string',
-                    },
-                    type: {
-                      const: 'subagent.started',
-                      type: 'string',
-                    },
-                  },
-                  required: [
-                    'type',
-                    'subagentId',
-                  ],
-                  type: 'object',
-                },
-                {
-                  properties: {
-                    reason: {
-                      type: 'string',
-                    },
-                    subagentId: {
-                      type: 'string',
-                    },
-                    type: {
-                      const: 'subagent.suspended',
-                      type: 'string',
-                    },
-                  },
-                  required: [
-                    'type',
-                    'subagentId',
-                    'reason',
-                  ],
-                  type: 'object',
-                },
-                {
-                  properties: {
-                    contextTokens: {
-                      type: 'number',
-                    },
-                    resultSummary: {
-                      type: 'string',
-                    },
-                    subagentId: {
-                      type: 'string',
-                    },
-                    type: {
-                      const: 'subagent.completed',
-                      type: 'string',
-                    },
-                    usage: {
+                    {
                       properties: {
-                        inputCacheCreation: {
-                          type: 'number',
+                        agent_id: {
+                          type: 'string',
                         },
-                        inputCacheRead: {
-                          type: 'number',
+                        answer: {
+                          properties: {
+                            answers: {
+                              additionalProperties: {
+                                anyOf: [
+                                  {
+                                    type: 'string',
+                                  },
+                                  {
+                                    const: true,
+                                    type: 'boolean',
+                                  },
+                                ],
+                              },
+                              propertyNames: {
+                                type: 'string',
+                              },
+                              type: 'object',
+                            },
+                            note: {
+                              type: 'string',
+                            },
+                          },
+                          required: [
+                            'answers',
+                          ],
+                          type: 'object',
                         },
-                        inputOther: {
-                          type: 'number',
+                        body: {
+                          type: 'string',
+                        },
+                        created_at: {
+                          type: 'string',
+                        },
+                        debug: {
+                          properties: {
+                            finish_reason: {
+                              type: 'string',
+                            },
+                            timing: {
+                              properties: {
+                                client_blocked_ms: {
+                                  type: 'number',
+                                },
+                                client_consume_ms: {
+                                  type: 'number',
+                                },
+                                first_token_ms: {
+                                  type: 'number',
+                                },
+                                request_build_ms: {
+                                  type: 'number',
+                                },
+                                server_decode_ms: {
+                                  type: 'number',
+                                },
+                                server_first_token_ms: {
+                                  type: 'number',
+                                },
+                                stream_ms: {
+                                  type: 'number',
+                                },
+                              },
+                              type: 'object',
+                            },
+                            usage: {
+                              properties: {
+                                input_cache_creation: {
+                                  minimum: 0,
+                                  type: 'number',
+                                },
+                                input_cache_read: {
+                                  minimum: 0,
+                                  type: 'number',
+                                },
+                                input_other: {
+                                  minimum: 0,
+                                  type: 'number',
+                                },
+                                output: {
+                                  minimum: 0,
+                                  type: 'number',
+                                },
+                              },
+                              required: [
+                                'input_other',
+                                'output',
+                                'input_cache_read',
+                                'input_cache_creation',
+                              ],
+                              type: 'object',
+                            },
+                          },
+                          type: 'object',
+                        },
+                        item_id: {
+                          minLength: 1,
+                          type: 'string',
+                        },
+                        notification_id: {
+                          type: 'string',
+                        },
+                        notification_type: {
+                          type: 'string',
+                        },
+                        outcome: {
+                          enum: [
+                            'completed',
+                            'interrupted',
+                            'failed',
+                          ],
+                          type: 'string',
                         },
                         output: {
-                          type: 'number',
+                          properties: {
+                            bytes: {
+                              maximum: 9007199254740991,
+                              minimum: 0,
+                              type: 'integer',
+                            },
+                            file: {
+                              type: 'string',
+                            },
+                            preview: {
+                              type: 'string',
+                            },
+                            truncated: {
+                              type: 'boolean',
+                            },
+                          },
+                          type: 'object',
+                        },
+                        severity: {
+                          enum: [
+                            'info',
+                            'warning',
+                            'error',
+                          ],
+                          type: 'string',
+                        },
+                        source: {
+                          properties: {
+                            id: {
+                              type: 'string',
+                            },
+                            kind: {
+                              type: 'string',
+                            },
+                          },
+                          required: [
+                            'kind',
+                            'id',
+                          ],
+                          type: 'object',
+                        },
+                        status: {
+                          enum: [
+                            'running',
+                            'ended',
+                          ],
+                          type: 'string',
+                        },
+                        step_index: {
+                          exclusiveMinimum: 0,
+                          maximum: 9007199254740991,
+                          type: 'integer',
+                        },
+                        task_id: {
+                          type: 'string',
+                        },
+                        title: {
+                          type: 'string',
+                        },
+                        type: {
+                          const: 'notification',
+                          type: 'string',
                         },
                       },
                       required: [
-                        'inputOther',
-                        'output',
-                        'inputCacheRead',
-                        'inputCacheCreation',
+                        'type',
+                        'item_id',
+                        'status',
+                        'created_at',
+                        'notification_id',
+                        'title',
+                        'body',
+                        'severity',
+                        'notification_type',
+                        'source',
                       ],
                       type: 'object',
                     },
-                  },
-                  required: [
-                    'type',
-                    'subagentId',
-                    'resultSummary',
-                  ],
-                  type: 'object',
-                },
-                {
-                  properties: {
-                    error: {
-                      type: 'string',
-                    },
-                    subagentId: {
-                      type: 'string',
-                    },
-                    type: {
-                      const: 'subagent.failed',
-                      type: 'string',
-                    },
-                  },
-                  required: [
-                    'type',
-                    'subagentId',
-                    'error',
-                  ],
-                  type: 'object',
-                },
-                {
-                  properties: {
-                    agentId: {
-                      type: 'string',
-                    },
-                    instruction: {
-                      type: 'string',
-                    },
-                    trigger: {
-                      enum: [
-                        'manual',
-                        'auto',
-                      ],
-                      type: 'string',
-                    },
-                    type: {
-                      const: 'compaction.started',
-                      type: 'string',
-                    },
-                  },
-                  required: [
-                    'type',
-                    'agentId',
-                    'trigger',
-                  ],
-                  type: 'object',
-                },
-                {
-                  properties: {
-                    agentId: {
-                      type: 'string',
-                    },
-                    turnId: {
-                      type: 'number',
-                    },
-                    type: {
-                      const: 'compaction.blocked',
-                      type: 'string',
-                    },
-                  },
-                  required: [
-                    'type',
-                    'agentId',
-                  ],
-                  type: 'object',
-                },
-                {
-                  properties: {
-                    agentId: {
-                      type: 'string',
-                    },
-                    type: {
-                      const: 'compaction.cancelled',
-                      type: 'string',
-                    },
-                  },
-                  required: [
-                    'type',
-                    'agentId',
-                  ],
-                  type: 'object',
-                },
-                {
-                  properties: {
-                    agentId: {
-                      type: 'string',
-                    },
-                    result: {
+                    {
                       properties: {
-                        compactedCount: {
-                          type: 'number',
+                        compacted_count: {
+                          maximum: 9007199254740991,
+                          minimum: 0,
+                          type: 'integer',
                         },
-                        droppedCount: {
-                          type: 'number',
+                        created_at: {
+                          type: 'string',
                         },
-                        keptHeadUserMessageCount: {
-                          type: 'number',
+                        debug: {
+                          properties: {
+                            finish_reason: {
+                              type: 'string',
+                            },
+                            timing: {
+                              properties: {
+                                client_blocked_ms: {
+                                  type: 'number',
+                                },
+                                client_consume_ms: {
+                                  type: 'number',
+                                },
+                                first_token_ms: {
+                                  type: 'number',
+                                },
+                                request_build_ms: {
+                                  type: 'number',
+                                },
+                                server_decode_ms: {
+                                  type: 'number',
+                                },
+                                server_first_token_ms: {
+                                  type: 'number',
+                                },
+                                stream_ms: {
+                                  type: 'number',
+                                },
+                              },
+                              type: 'object',
+                            },
+                            usage: {
+                              properties: {
+                                input_cache_creation: {
+                                  minimum: 0,
+                                  type: 'number',
+                                },
+                                input_cache_read: {
+                                  minimum: 0,
+                                  type: 'number',
+                                },
+                                input_other: {
+                                  minimum: 0,
+                                  type: 'number',
+                                },
+                                output: {
+                                  minimum: 0,
+                                  type: 'number',
+                                },
+                              },
+                              required: [
+                                'input_other',
+                                'output',
+                                'input_cache_read',
+                                'input_cache_creation',
+                              ],
+                              type: 'object',
+                            },
+                          },
+                          type: 'object',
                         },
-                        keptUserMessageCount: {
-                          type: 'number',
+                        instruction: {
+                          type: 'string',
+                        },
+                        item_id: {
+                          minLength: 1,
+                          type: 'string',
+                        },
+                        kind: {
+                          const: 'compaction',
+                          type: 'string',
+                        },
+                        outcome: {
+                          enum: [
+                            'completed',
+                            'interrupted',
+                            'failed',
+                          ],
+                          type: 'string',
+                        },
+                        status: {
+                          enum: [
+                            'running',
+                            'ended',
+                          ],
+                          type: 'string',
+                        },
+                        step_index: {
+                          exclusiveMinimum: 0,
+                          maximum: 9007199254740991,
+                          type: 'integer',
                         },
                         summary: {
                           type: 'string',
                         },
-                        tokensAfter: {
+                        tokens_after: {
+                          minimum: 0,
                           type: 'number',
                         },
-                        tokensBefore: {
+                        tokens_before: {
+                          minimum: 0,
                           type: 'number',
+                        },
+                        trigger: {
+                          enum: [
+                            'manual',
+                            'auto',
+                          ],
+                          type: 'string',
+                        },
+                        type: {
+                          const: 'system',
+                          type: 'string',
                         },
                       },
                       required: [
-                        'summary',
-                        'compactedCount',
-                        'tokensBefore',
-                        'tokensAfter',
+                        'type',
+                        'item_id',
+                        'status',
+                        'created_at',
+                        'kind',
+                        'trigger',
                       ],
                       type: 'object',
                     },
-                    type: {
-                      const: 'compaction.completed',
-                      type: 'string',
-                    },
-                  },
-                  required: [
-                    'type',
-                    'agentId',
-                    'result',
-                  ],
-                  type: 'object',
-                },
-                {
-                  properties: {
-                    agentId: {
-                      type: 'string',
-                    },
-                    info: {
-                      oneOf: [
-                        {
-                          properties: {
-                            command: {
-                              type: 'string',
-                            },
-                            description: {
-                              type: 'string',
-                            },
-                            detached: {
-                              type: 'boolean',
-                            },
-                            endedAt: {
-                              anyOf: [
-                                {
-                                  type: 'number',
-                                },
-                                {
-                                  type: 'null',
-                                },
-                              ],
-                            },
-                            exitCode: {
-                              anyOf: [
-                                {
-                                  type: 'number',
-                                },
-                                {
-                                  type: 'null',
-                                },
-                              ],
-                            },
-                            kind: {
-                              const: 'process',
-                              type: 'string',
-                            },
-                            pid: {
-                              type: 'number',
-                            },
-                            startedAt: {
-                              type: 'number',
-                            },
-                            status: {
-                              enum: [
-                                'running',
-                                'completed',
-                                'failed',
-                                'timed_out',
-                                'killed',
-                                'lost',
-                              ],
-                              type: 'string',
-                            },
-                            stopReason: {
-                              type: 'string',
-                            },
-                            taskId: {
-                              type: 'string',
-                            },
-                            terminalNotificationSuppressed: {
-                              type: 'boolean',
-                            },
-                            timeoutMs: {
-                              type: 'number',
-                            },
-                          },
-                          required: [
-                            'taskId',
-                            'description',
-                            'status',
-                            'startedAt',
-                            'endedAt',
-                            'kind',
-                            'command',
-                            'pid',
-                            'exitCode',
-                          ],
-                          type: 'object',
-                        },
-                        {
-                          properties: {
-                            agentId: {
-                              type: 'string',
-                            },
-                            description: {
-                              type: 'string',
-                            },
-                            detached: {
-                              type: 'boolean',
-                            },
-                            endedAt: {
-                              anyOf: [
-                                {
-                                  type: 'number',
-                                },
-                                {
-                                  type: 'null',
-                                },
-                              ],
-                            },
-                            kind: {
-                              const: 'agent',
-                              type: 'string',
-                            },
-                            model: {
-                              type: 'string',
-                            },
-                            startedAt: {
-                              type: 'number',
-                            },
-                            status: {
-                              enum: [
-                                'running',
-                                'completed',
-                                'failed',
-                                'timed_out',
-                                'killed',
-                                'lost',
-                              ],
-                              type: 'string',
-                            },
-                            stopReason: {
-                              type: 'string',
-                            },
-                            subagentType: {
-                              type: 'string',
-                            },
-                            taskId: {
-                              type: 'string',
-                            },
-                            terminalNotificationSuppressed: {
-                              type: 'boolean',
-                            },
-                            thinkingEffort: {
-                              type: 'string',
-                            },
-                            timeoutMs: {
-                              type: 'number',
-                            },
-                          },
-                          required: [
-                            'taskId',
-                            'description',
-                            'status',
-                            'startedAt',
-                            'endedAt',
-                            'kind',
-                          ],
-                          type: 'object',
-                        },
-                        {
-                          properties: {
-                            description: {
-                              type: 'string',
-                            },
-                            detached: {
-                              type: 'boolean',
-                            },
-                            endedAt: {
-                              anyOf: [
-                                {
-                                  type: 'number',
-                                },
-                                {
-                                  type: 'null',
-                                },
-                              ],
-                            },
-                            kind: {
-                              const: 'question',
-                              type: 'string',
-                            },
-                            questionCount: {
-                              type: 'number',
-                            },
-                            startedAt: {
-                              type: 'number',
-                            },
-                            status: {
-                              enum: [
-                                'running',
-                                'completed',
-                                'failed',
-                                'timed_out',
-                                'killed',
-                                'lost',
-                              ],
-                              type: 'string',
-                            },
-                            stopReason: {
-                              type: 'string',
-                            },
-                            taskId: {
-                              type: 'string',
-                            },
-                            terminalNotificationSuppressed: {
-                              type: 'boolean',
-                            },
-                            timeoutMs: {
-                              type: 'number',
-                            },
-                            toolCallId: {
-                              type: 'string',
-                            },
-                          },
-                          required: [
-                            'taskId',
-                            'description',
-                            'status',
-                            'startedAt',
-                            'endedAt',
-                            'kind',
-                            'questionCount',
-                          ],
-                          type: 'object',
-                        },
-                      ],
-                    },
-                    type: {
-                      const: 'task.started',
-                      type: 'string',
-                    },
-                  },
-                  required: [
-                    'type',
-                    'agentId',
-                    'info',
-                  ],
-                  type: 'object',
-                },
-                {
-                  properties: {
-                    agentId: {
-                      type: 'string',
-                    },
-                    info: {
-                      oneOf: [
-                        {
-                          properties: {
-                            command: {
-                              type: 'string',
-                            },
-                            description: {
-                              type: 'string',
-                            },
-                            detached: {
-                              type: 'boolean',
-                            },
-                            endedAt: {
-                              anyOf: [
-                                {
-                                  type: 'number',
-                                },
-                                {
-                                  type: 'null',
-                                },
-                              ],
-                            },
-                            exitCode: {
-                              anyOf: [
-                                {
-                                  type: 'number',
-                                },
-                                {
-                                  type: 'null',
-                                },
-                              ],
-                            },
-                            kind: {
-                              const: 'process',
-                              type: 'string',
-                            },
-                            pid: {
-                              type: 'number',
-                            },
-                            startedAt: {
-                              type: 'number',
-                            },
-                            status: {
-                              enum: [
-                                'running',
-                                'completed',
-                                'failed',
-                                'timed_out',
-                                'killed',
-                                'lost',
-                              ],
-                              type: 'string',
-                            },
-                            stopReason: {
-                              type: 'string',
-                            },
-                            taskId: {
-                              type: 'string',
-                            },
-                            terminalNotificationSuppressed: {
-                              type: 'boolean',
-                            },
-                            timeoutMs: {
-                              type: 'number',
-                            },
-                          },
-                          required: [
-                            'taskId',
-                            'description',
-                            'status',
-                            'startedAt',
-                            'endedAt',
-                            'kind',
-                            'command',
-                            'pid',
-                            'exitCode',
-                          ],
-                          type: 'object',
-                        },
-                        {
-                          properties: {
-                            agentId: {
-                              type: 'string',
-                            },
-                            description: {
-                              type: 'string',
-                            },
-                            detached: {
-                              type: 'boolean',
-                            },
-                            endedAt: {
-                              anyOf: [
-                                {
-                                  type: 'number',
-                                },
-                                {
-                                  type: 'null',
-                                },
-                              ],
-                            },
-                            kind: {
-                              const: 'agent',
-                              type: 'string',
-                            },
-                            model: {
-                              type: 'string',
-                            },
-                            startedAt: {
-                              type: 'number',
-                            },
-                            status: {
-                              enum: [
-                                'running',
-                                'completed',
-                                'failed',
-                                'timed_out',
-                                'killed',
-                                'lost',
-                              ],
-                              type: 'string',
-                            },
-                            stopReason: {
-                              type: 'string',
-                            },
-                            subagentType: {
-                              type: 'string',
-                            },
-                            taskId: {
-                              type: 'string',
-                            },
-                            terminalNotificationSuppressed: {
-                              type: 'boolean',
-                            },
-                            thinkingEffort: {
-                              type: 'string',
-                            },
-                            timeoutMs: {
-                              type: 'number',
-                            },
-                          },
-                          required: [
-                            'taskId',
-                            'description',
-                            'status',
-                            'startedAt',
-                            'endedAt',
-                            'kind',
-                          ],
-                          type: 'object',
-                        },
-                        {
-                          properties: {
-                            description: {
-                              type: 'string',
-                            },
-                            detached: {
-                              type: 'boolean',
-                            },
-                            endedAt: {
-                              anyOf: [
-                                {
-                                  type: 'number',
-                                },
-                                {
-                                  type: 'null',
-                                },
-                              ],
-                            },
-                            kind: {
-                              const: 'question',
-                              type: 'string',
-                            },
-                            questionCount: {
-                              type: 'number',
-                            },
-                            startedAt: {
-                              type: 'number',
-                            },
-                            status: {
-                              enum: [
-                                'running',
-                                'completed',
-                                'failed',
-                                'timed_out',
-                                'killed',
-                                'lost',
-                              ],
-                              type: 'string',
-                            },
-                            stopReason: {
-                              type: 'string',
-                            },
-                            taskId: {
-                              type: 'string',
-                            },
-                            terminalNotificationSuppressed: {
-                              type: 'boolean',
-                            },
-                            timeoutMs: {
-                              type: 'number',
-                            },
-                            toolCallId: {
-                              type: 'string',
-                            },
-                          },
-                          required: [
-                            'taskId',
-                            'description',
-                            'status',
-                            'startedAt',
-                            'endedAt',
-                            'kind',
-                            'questionCount',
-                          ],
-                          type: 'object',
-                        },
-                      ],
-                    },
-                    type: {
-                      const: 'task.terminated',
-                      type: 'string',
-                    },
-                  },
-                  required: [
-                    'type',
-                    'agentId',
-                    'info',
-                  ],
-                  type: 'object',
-                },
-                {
-                  properties: {
-                    info: {
-                      oneOf: [
-                        {
-                          properties: {
-                            command: {
-                              type: 'string',
-                            },
-                            description: {
-                              type: 'string',
-                            },
-                            detached: {
-                              type: 'boolean',
-                            },
-                            endedAt: {
-                              anyOf: [
-                                {
-                                  type: 'number',
-                                },
-                                {
-                                  type: 'null',
-                                },
-                              ],
-                            },
-                            exitCode: {
-                              anyOf: [
-                                {
-                                  type: 'number',
-                                },
-                                {
-                                  type: 'null',
-                                },
-                              ],
-                            },
-                            kind: {
-                              const: 'process',
-                              type: 'string',
-                            },
-                            pid: {
-                              type: 'number',
-                            },
-                            startedAt: {
-                              type: 'number',
-                            },
-                            status: {
-                              enum: [
-                                'running',
-                                'completed',
-                                'failed',
-                                'timed_out',
-                                'killed',
-                                'lost',
-                              ],
-                              type: 'string',
-                            },
-                            stopReason: {
-                              type: 'string',
-                            },
-                            taskId: {
-                              type: 'string',
-                            },
-                            terminalNotificationSuppressed: {
-                              type: 'boolean',
-                            },
-                            timeoutMs: {
-                              type: 'number',
-                            },
-                          },
-                          required: [
-                            'taskId',
-                            'description',
-                            'status',
-                            'startedAt',
-                            'endedAt',
-                            'kind',
-                            'command',
-                            'pid',
-                            'exitCode',
-                          ],
-                          type: 'object',
-                        },
-                        {
-                          properties: {
-                            agentId: {
-                              type: 'string',
-                            },
-                            description: {
-                              type: 'string',
-                            },
-                            detached: {
-                              type: 'boolean',
-                            },
-                            endedAt: {
-                              anyOf: [
-                                {
-                                  type: 'number',
-                                },
-                                {
-                                  type: 'null',
-                                },
-                              ],
-                            },
-                            kind: {
-                              const: 'agent',
-                              type: 'string',
-                            },
-                            model: {
-                              type: 'string',
-                            },
-                            startedAt: {
-                              type: 'number',
-                            },
-                            status: {
-                              enum: [
-                                'running',
-                                'completed',
-                                'failed',
-                                'timed_out',
-                                'killed',
-                                'lost',
-                              ],
-                              type: 'string',
-                            },
-                            stopReason: {
-                              type: 'string',
-                            },
-                            subagentType: {
-                              type: 'string',
-                            },
-                            taskId: {
-                              type: 'string',
-                            },
-                            terminalNotificationSuppressed: {
-                              type: 'boolean',
-                            },
-                            thinkingEffort: {
-                              type: 'string',
-                            },
-                            timeoutMs: {
-                              type: 'number',
-                            },
-                          },
-                          required: [
-                            'taskId',
-                            'description',
-                            'status',
-                            'startedAt',
-                            'endedAt',
-                            'kind',
-                          ],
-                          type: 'object',
-                        },
-                        {
-                          properties: {
-                            description: {
-                              type: 'string',
-                            },
-                            detached: {
-                              type: 'boolean',
-                            },
-                            endedAt: {
-                              anyOf: [
-                                {
-                                  type: 'number',
-                                },
-                                {
-                                  type: 'null',
-                                },
-                              ],
-                            },
-                            kind: {
-                              const: 'question',
-                              type: 'string',
-                            },
-                            questionCount: {
-                              type: 'number',
-                            },
-                            startedAt: {
-                              type: 'number',
-                            },
-                            status: {
-                              enum: [
-                                'running',
-                                'completed',
-                                'failed',
-                                'timed_out',
-                                'killed',
-                                'lost',
-                              ],
-                              type: 'string',
-                            },
-                            stopReason: {
-                              type: 'string',
-                            },
-                            taskId: {
-                              type: 'string',
-                            },
-                            terminalNotificationSuppressed: {
-                              type: 'boolean',
-                            },
-                            timeoutMs: {
-                              type: 'number',
-                            },
-                            toolCallId: {
-                              type: 'string',
-                            },
-                          },
-                          required: [
-                            'taskId',
-                            'description',
-                            'status',
-                            'startedAt',
-                            'endedAt',
-                            'kind',
-                            'questionCount',
-                          ],
-                          type: 'object',
-                        },
-                      ],
-                    },
-                    type: {
-                      const: 'background.task.started',
-                      type: 'string',
-                    },
-                  },
-                  required: [
-                    'type',
-                    'info',
-                  ],
-                  type: 'object',
-                },
-                {
-                  properties: {
-                    info: {
-                      oneOf: [
-                        {
-                          properties: {
-                            command: {
-                              type: 'string',
-                            },
-                            description: {
-                              type: 'string',
-                            },
-                            detached: {
-                              type: 'boolean',
-                            },
-                            endedAt: {
-                              anyOf: [
-                                {
-                                  type: 'number',
-                                },
-                                {
-                                  type: 'null',
-                                },
-                              ],
-                            },
-                            exitCode: {
-                              anyOf: [
-                                {
-                                  type: 'number',
-                                },
-                                {
-                                  type: 'null',
-                                },
-                              ],
-                            },
-                            kind: {
-                              const: 'process',
-                              type: 'string',
-                            },
-                            pid: {
-                              type: 'number',
-                            },
-                            startedAt: {
-                              type: 'number',
-                            },
-                            status: {
-                              enum: [
-                                'running',
-                                'completed',
-                                'failed',
-                                'timed_out',
-                                'killed',
-                                'lost',
-                              ],
-                              type: 'string',
-                            },
-                            stopReason: {
-                              type: 'string',
-                            },
-                            taskId: {
-                              type: 'string',
-                            },
-                            terminalNotificationSuppressed: {
-                              type: 'boolean',
-                            },
-                            timeoutMs: {
-                              type: 'number',
-                            },
-                          },
-                          required: [
-                            'taskId',
-                            'description',
-                            'status',
-                            'startedAt',
-                            'endedAt',
-                            'kind',
-                            'command',
-                            'pid',
-                            'exitCode',
-                          ],
-                          type: 'object',
-                        },
-                        {
-                          properties: {
-                            agentId: {
-                              type: 'string',
-                            },
-                            description: {
-                              type: 'string',
-                            },
-                            detached: {
-                              type: 'boolean',
-                            },
-                            endedAt: {
-                              anyOf: [
-                                {
-                                  type: 'number',
-                                },
-                                {
-                                  type: 'null',
-                                },
-                              ],
-                            },
-                            kind: {
-                              const: 'agent',
-                              type: 'string',
-                            },
-                            model: {
-                              type: 'string',
-                            },
-                            startedAt: {
-                              type: 'number',
-                            },
-                            status: {
-                              enum: [
-                                'running',
-                                'completed',
-                                'failed',
-                                'timed_out',
-                                'killed',
-                                'lost',
-                              ],
-                              type: 'string',
-                            },
-                            stopReason: {
-                              type: 'string',
-                            },
-                            subagentType: {
-                              type: 'string',
-                            },
-                            taskId: {
-                              type: 'string',
-                            },
-                            terminalNotificationSuppressed: {
-                              type: 'boolean',
-                            },
-                            thinkingEffort: {
-                              type: 'string',
-                            },
-                            timeoutMs: {
-                              type: 'number',
-                            },
-                          },
-                          required: [
-                            'taskId',
-                            'description',
-                            'status',
-                            'startedAt',
-                            'endedAt',
-                            'kind',
-                          ],
-                          type: 'object',
-                        },
-                        {
-                          properties: {
-                            description: {
-                              type: 'string',
-                            },
-                            detached: {
-                              type: 'boolean',
-                            },
-                            endedAt: {
-                              anyOf: [
-                                {
-                                  type: 'number',
-                                },
-                                {
-                                  type: 'null',
-                                },
-                              ],
-                            },
-                            kind: {
-                              const: 'question',
-                              type: 'string',
-                            },
-                            questionCount: {
-                              type: 'number',
-                            },
-                            startedAt: {
-                              type: 'number',
-                            },
-                            status: {
-                              enum: [
-                                'running',
-                                'completed',
-                                'failed',
-                                'timed_out',
-                                'killed',
-                                'lost',
-                              ],
-                              type: 'string',
-                            },
-                            stopReason: {
-                              type: 'string',
-                            },
-                            taskId: {
-                              type: 'string',
-                            },
-                            terminalNotificationSuppressed: {
-                              type: 'boolean',
-                            },
-                            timeoutMs: {
-                              type: 'number',
-                            },
-                            toolCallId: {
-                              type: 'string',
-                            },
-                          },
-                          required: [
-                            'taskId',
-                            'description',
-                            'status',
-                            'startedAt',
-                            'endedAt',
-                            'kind',
-                            'questionCount',
-                          ],
-                          type: 'object',
-                        },
-                      ],
-                    },
-                    type: {
-                      const: 'background.task.terminated',
-                      type: 'string',
-                    },
-                  },
-                  required: [
-                    'type',
-                    'info',
-                  ],
-                  type: 'object',
-                },
-                {
-                  properties: {
-                    origin: {
+                    {
                       properties: {
-                        coalescedCount: {
-                          type: 'number',
-                        },
-                        cron: {
+                        created_at: {
                           type: 'string',
                         },
-                        jobId: {
+                        debug: {
+                          properties: {
+                            finish_reason: {
+                              type: 'string',
+                            },
+                            timing: {
+                              properties: {
+                                client_blocked_ms: {
+                                  type: 'number',
+                                },
+                                client_consume_ms: {
+                                  type: 'number',
+                                },
+                                first_token_ms: {
+                                  type: 'number',
+                                },
+                                request_build_ms: {
+                                  type: 'number',
+                                },
+                                server_decode_ms: {
+                                  type: 'number',
+                                },
+                                server_first_token_ms: {
+                                  type: 'number',
+                                },
+                                stream_ms: {
+                                  type: 'number',
+                                },
+                              },
+                              type: 'object',
+                            },
+                            usage: {
+                              properties: {
+                                input_cache_creation: {
+                                  minimum: 0,
+                                  type: 'number',
+                                },
+                                input_cache_read: {
+                                  minimum: 0,
+                                  type: 'number',
+                                },
+                                input_other: {
+                                  minimum: 0,
+                                  type: 'number',
+                                },
+                                output: {
+                                  minimum: 0,
+                                  type: 'number',
+                                },
+                              },
+                              required: [
+                                'input_other',
+                                'output',
+                                'input_cache_read',
+                                'input_cache_creation',
+                              ],
+                              type: 'object',
+                            },
+                          },
+                          type: 'object',
+                        },
+                        forked_from: {
+                          properties: {
+                            agent_id: {
+                              minLength: 1,
+                              type: 'string',
+                            },
+                          },
+                          required: [
+                            'agent_id',
+                          ],
+                          type: 'object',
+                        },
+                        item_id: {
+                          minLength: 1,
                           type: 'string',
                         },
                         kind: {
-                          const: 'cron_job',
+                          const: 'fork_boundary',
                           type: 'string',
                         },
-                        recurring: {
-                          type: 'boolean',
+                        outcome: {
+                          enum: [
+                            'completed',
+                            'interrupted',
+                            'failed',
+                          ],
+                          type: 'string',
                         },
-                        stale: {
-                          type: 'boolean',
+                        source: {
+                          enum: [
+                            'btw',
+                            'fork',
+                          ],
+                          type: 'string',
+                        },
+                        status: {
+                          enum: [
+                            'running',
+                            'ended',
+                          ],
+                          type: 'string',
+                        },
+                        step_index: {
+                          exclusiveMinimum: 0,
+                          maximum: 9007199254740991,
+                          type: 'integer',
+                        },
+                        type: {
+                          const: 'system',
+                          type: 'string',
                         },
                       },
                       required: [
+                        'type',
+                        'item_id',
+                        'status',
+                        'created_at',
                         'kind',
-                        'jobId',
-                        'cron',
-                        'recurring',
-                        'coalescedCount',
-                        'stale',
+                        'source',
+                        'forked_from',
                       ],
                       type: 'object',
                     },
-                    prompt: {
-                      type: 'string',
-                    },
-                    type: {
-                      const: 'cron.fired',
-                      type: 'string',
-                    },
-                  },
-                  required: [
-                    'type',
-                    'origin',
-                    'prompt',
                   ],
-                  type: 'object',
                 },
-                {
-                  properties: {
-                    content: {
-                      items: {
-                        oneOf: [
-                          {
-                            properties: {
-                              text: {
-                                type: 'string',
-                              },
-                              type: {
-                                const: 'text',
-                                type: 'string',
-                              },
-                            },
-                            required: [
-                              'type',
-                              'text',
-                            ],
-                            type: 'object',
-                          },
-                          {
-                            properties: {
-                              input: {},
-                              tool_call_id: {
-                                minLength: 1,
-                                type: 'string',
-                              },
-                              tool_name: {
-                                minLength: 1,
-                                type: 'string',
-                              },
-                              type: {
-                                const: 'tool_use',
-                                type: 'string',
-                              },
-                            },
-                            required: [
-                              'type',
-                              'tool_call_id',
-                              'tool_name',
-                              'input',
-                            ],
-                            type: 'object',
-                          },
-                          {
-                            properties: {
-                              is_error: {
-                                type: 'boolean',
-                              },
-                              output: {},
-                              tool_call_id: {
-                                minLength: 1,
-                                type: 'string',
-                              },
-                              type: {
-                                const: 'tool_result',
-                                type: 'string',
-                              },
-                            },
-                            required: [
-                              'type',
-                              'tool_call_id',
-                              'output',
-                            ],
-                            type: 'object',
-                          },
-                          {
-                            properties: {
-                              source: {
-                                oneOf: [
-                                  {
-                                    properties: {
-                                      id: {
-                                        minLength: 1,
-                                        type: 'string',
-                                      },
-                                      kind: {
-                                        const: 'url',
-                                        type: 'string',
-                                      },
-                                      url: {
-                                        minLength: 1,
-                                        type: 'string',
-                                      },
-                                    },
-                                    required: [
-                                      'kind',
-                                      'url',
-                                    ],
-                                    type: 'object',
-                                  },
-                                  {
-                                    properties: {
-                                      data: {
-                                        minLength: 1,
-                                        type: 'string',
-                                      },
-                                      kind: {
-                                        const: 'base64',
-                                        type: 'string',
-                                      },
-                                      media_type: {
-                                        minLength: 1,
-                                        type: 'string',
-                                      },
-                                    },
-                                    required: [
-                                      'kind',
-                                      'media_type',
-                                      'data',
-                                    ],
-                                    type: 'object',
-                                  },
-                                  {
-                                    properties: {
-                                      file_id: {
-                                        minLength: 1,
-                                        type: 'string',
-                                      },
-                                      kind: {
-                                        const: 'file',
-                                        type: 'string',
-                                      },
-                                    },
-                                    required: [
-                                      'kind',
-                                      'file_id',
-                                    ],
-                                    type: 'object',
-                                  },
-                                  {
-                                    properties: {
-                                      file_id: {
-                                        minLength: 1,
-                                        type: 'string',
-                                      },
-                                      kind: {
-                                        const: 'session_media',
-                                        type: 'string',
-                                      },
-                                    },
-                                    required: [
-                                      'kind',
-                                      'file_id',
-                                    ],
-                                    type: 'object',
-                                  },
-                                  {
-                                    properties: {
-                                      kind: {
-                                        const: 'path',
-                                        type: 'string',
-                                      },
-                                      path: {
-                                        minLength: 1,
-                                        type: 'string',
-                                      },
-                                    },
-                                    required: [
-                                      'kind',
-                                      'path',
-                                    ],
-                                    type: 'object',
-                                  },
-                                ],
-                              },
-                              type: {
-                                const: 'image',
-                                type: 'string',
-                              },
-                            },
-                            required: [
-                              'type',
-                              'source',
-                            ],
-                            type: 'object',
-                          },
-                          {
-                            properties: {
-                              source: {
-                                oneOf: [
-                                  {
-                                    properties: {
-                                      id: {
-                                        minLength: 1,
-                                        type: 'string',
-                                      },
-                                      kind: {
-                                        const: 'url',
-                                        type: 'string',
-                                      },
-                                      url: {
-                                        minLength: 1,
-                                        type: 'string',
-                                      },
-                                    },
-                                    required: [
-                                      'kind',
-                                      'url',
-                                    ],
-                                    type: 'object',
-                                  },
-                                  {
-                                    properties: {
-                                      data: {
-                                        minLength: 1,
-                                        type: 'string',
-                                      },
-                                      kind: {
-                                        const: 'base64',
-                                        type: 'string',
-                                      },
-                                      media_type: {
-                                        minLength: 1,
-                                        type: 'string',
-                                      },
-                                    },
-                                    required: [
-                                      'kind',
-                                      'media_type',
-                                      'data',
-                                    ],
-                                    type: 'object',
-                                  },
-                                  {
-                                    properties: {
-                                      file_id: {
-                                        minLength: 1,
-                                        type: 'string',
-                                      },
-                                      kind: {
-                                        const: 'file',
-                                        type: 'string',
-                                      },
-                                    },
-                                    required: [
-                                      'kind',
-                                      'file_id',
-                                    ],
-                                    type: 'object',
-                                  },
-                                  {
-                                    properties: {
-                                      file_id: {
-                                        minLength: 1,
-                                        type: 'string',
-                                      },
-                                      kind: {
-                                        const: 'session_media',
-                                        type: 'string',
-                                      },
-                                    },
-                                    required: [
-                                      'kind',
-                                      'file_id',
-                                    ],
-                                    type: 'object',
-                                  },
-                                  {
-                                    properties: {
-                                      kind: {
-                                        const: 'path',
-                                        type: 'string',
-                                      },
-                                      path: {
-                                        minLength: 1,
-                                        type: 'string',
-                                      },
-                                    },
-                                    required: [
-                                      'kind',
-                                      'path',
-                                    ],
-                                    type: 'object',
-                                  },
-                                ],
-                              },
-                              type: {
-                                const: 'video',
-                                type: 'string',
-                              },
-                            },
-                            required: [
-                              'type',
-                              'source',
-                            ],
-                            type: 'object',
-                          },
-                          {
-                            properties: {
-                              file_id: {
-                                minLength: 1,
-                                type: 'string',
-                              },
-                              media_type: {
-                                minLength: 1,
-                                type: 'string',
-                              },
-                              name: {
-                                type: 'string',
-                              },
-                              path: {
-                                minLength: 1,
-                                type: 'string',
-                              },
-                              size: {
-                                maximum: 9007199254740991,
-                                minimum: 0,
-                                type: 'integer',
-                              },
-                              type: {
-                                const: 'file',
-                                type: 'string',
-                              },
-                            },
-                            required: [
-                              'type',
-                            ],
-                            type: 'object',
-                          },
-                          {
-                            properties: {
-                              signature: {
-                                type: 'string',
-                              },
-                              thinking: {
-                                type: 'string',
-                              },
-                              type: {
-                                const: 'thinking',
-                                type: 'string',
-                              },
-                            },
-                            required: [
-                              'type',
-                              'thinking',
-                            ],
-                            type: 'object',
-                          },
-                        ],
-                      },
-                      type: 'array',
-                    },
-                    createdAt: {
-                      type: 'string',
-                    },
-                    promptId: {
-                      type: 'string',
-                    },
-                    status: {
-                      enum: [
-                        'running',
-                        'queued',
-                        'blocked',
-                      ],
-                      type: 'string',
-                    },
-                    type: {
-                      const: 'prompt.submitted',
-                      type: 'string',
-                    },
-                    userMessageId: {
-                      type: 'string',
-                    },
-                  },
-                  required: [
-                    'type',
-                    'promptId',
-                    'userMessageId',
-                    'status',
-                    'content',
-                    'createdAt',
-                  ],
-                  type: 'object',
-                },
-                {
-                  properties: {
-                    agentId: {
-                      type: 'string',
-                    },
-                    finishedAt: {
-                      type: 'string',
-                    },
-                    promptId: {
-                      type: 'string',
-                    },
-                    reason: {
-                      enum: [
-                        'completed',
-                        'failed',
-                        'blocked',
-                      ],
-                      type: 'string',
-                    },
-                    type: {
-                      const: 'prompt.completed',
-                      type: 'string',
-                    },
-                  },
-                  required: [
-                    'type',
-                    'agentId',
-                    'promptId',
-                    'finishedAt',
-                  ],
-                  type: 'object',
-                },
-                {
-                  properties: {
-                    abortedAt: {
-                      type: 'string',
-                    },
-                    agentId: {
-                      type: 'string',
-                    },
-                    promptId: {
-                      type: 'string',
-                    },
-                    type: {
-                      const: 'prompt.aborted',
-                      type: 'string',
-                    },
-                  },
-                  required: [
-                    'type',
-                    'agentId',
-                    'promptId',
-                    'abortedAt',
-                  ],
-                  type: 'object',
-                },
-                {
-                  properties: {
-                    activePromptId: {
-                      type: 'string',
-                    },
-                    agentId: {
-                      type: 'string',
-                    },
-                    content: {
-                      items: {
-                        oneOf: [
-                          {
-                            properties: {
-                              text: {
-                                type: 'string',
-                              },
-                              type: {
-                                const: 'text',
-                                type: 'string',
-                              },
-                            },
-                            required: [
-                              'type',
-                              'text',
-                            ],
-                            type: 'object',
-                          },
-                          {
-                            properties: {
-                              input: {},
-                              tool_call_id: {
-                                minLength: 1,
-                                type: 'string',
-                              },
-                              tool_name: {
-                                minLength: 1,
-                                type: 'string',
-                              },
-                              type: {
-                                const: 'tool_use',
-                                type: 'string',
-                              },
-                            },
-                            required: [
-                              'type',
-                              'tool_call_id',
-                              'tool_name',
-                              'input',
-                            ],
-                            type: 'object',
-                          },
-                          {
-                            properties: {
-                              is_error: {
-                                type: 'boolean',
-                              },
-                              output: {},
-                              tool_call_id: {
-                                minLength: 1,
-                                type: 'string',
-                              },
-                              type: {
-                                const: 'tool_result',
-                                type: 'string',
-                              },
-                            },
-                            required: [
-                              'type',
-                              'tool_call_id',
-                              'output',
-                            ],
-                            type: 'object',
-                          },
-                          {
-                            properties: {
-                              source: {
-                                oneOf: [
-                                  {
-                                    properties: {
-                                      id: {
-                                        minLength: 1,
-                                        type: 'string',
-                                      },
-                                      kind: {
-                                        const: 'url',
-                                        type: 'string',
-                                      },
-                                      url: {
-                                        minLength: 1,
-                                        type: 'string',
-                                      },
-                                    },
-                                    required: [
-                                      'kind',
-                                      'url',
-                                    ],
-                                    type: 'object',
-                                  },
-                                  {
-                                    properties: {
-                                      data: {
-                                        minLength: 1,
-                                        type: 'string',
-                                      },
-                                      kind: {
-                                        const: 'base64',
-                                        type: 'string',
-                                      },
-                                      media_type: {
-                                        minLength: 1,
-                                        type: 'string',
-                                      },
-                                    },
-                                    required: [
-                                      'kind',
-                                      'media_type',
-                                      'data',
-                                    ],
-                                    type: 'object',
-                                  },
-                                  {
-                                    properties: {
-                                      file_id: {
-                                        minLength: 1,
-                                        type: 'string',
-                                      },
-                                      kind: {
-                                        const: 'file',
-                                        type: 'string',
-                                      },
-                                    },
-                                    required: [
-                                      'kind',
-                                      'file_id',
-                                    ],
-                                    type: 'object',
-                                  },
-                                  {
-                                    properties: {
-                                      file_id: {
-                                        minLength: 1,
-                                        type: 'string',
-                                      },
-                                      kind: {
-                                        const: 'session_media',
-                                        type: 'string',
-                                      },
-                                    },
-                                    required: [
-                                      'kind',
-                                      'file_id',
-                                    ],
-                                    type: 'object',
-                                  },
-                                  {
-                                    properties: {
-                                      kind: {
-                                        const: 'path',
-                                        type: 'string',
-                                      },
-                                      path: {
-                                        minLength: 1,
-                                        type: 'string',
-                                      },
-                                    },
-                                    required: [
-                                      'kind',
-                                      'path',
-                                    ],
-                                    type: 'object',
-                                  },
-                                ],
-                              },
-                              type: {
-                                const: 'image',
-                                type: 'string',
-                              },
-                            },
-                            required: [
-                              'type',
-                              'source',
-                            ],
-                            type: 'object',
-                          },
-                          {
-                            properties: {
-                              source: {
-                                oneOf: [
-                                  {
-                                    properties: {
-                                      id: {
-                                        minLength: 1,
-                                        type: 'string',
-                                      },
-                                      kind: {
-                                        const: 'url',
-                                        type: 'string',
-                                      },
-                                      url: {
-                                        minLength: 1,
-                                        type: 'string',
-                                      },
-                                    },
-                                    required: [
-                                      'kind',
-                                      'url',
-                                    ],
-                                    type: 'object',
-                                  },
-                                  {
-                                    properties: {
-                                      data: {
-                                        minLength: 1,
-                                        type: 'string',
-                                      },
-                                      kind: {
-                                        const: 'base64',
-                                        type: 'string',
-                                      },
-                                      media_type: {
-                                        minLength: 1,
-                                        type: 'string',
-                                      },
-                                    },
-                                    required: [
-                                      'kind',
-                                      'media_type',
-                                      'data',
-                                    ],
-                                    type: 'object',
-                                  },
-                                  {
-                                    properties: {
-                                      file_id: {
-                                        minLength: 1,
-                                        type: 'string',
-                                      },
-                                      kind: {
-                                        const: 'file',
-                                        type: 'string',
-                                      },
-                                    },
-                                    required: [
-                                      'kind',
-                                      'file_id',
-                                    ],
-                                    type: 'object',
-                                  },
-                                  {
-                                    properties: {
-                                      file_id: {
-                                        minLength: 1,
-                                        type: 'string',
-                                      },
-                                      kind: {
-                                        const: 'session_media',
-                                        type: 'string',
-                                      },
-                                    },
-                                    required: [
-                                      'kind',
-                                      'file_id',
-                                    ],
-                                    type: 'object',
-                                  },
-                                  {
-                                    properties: {
-                                      kind: {
-                                        const: 'path',
-                                        type: 'string',
-                                      },
-                                      path: {
-                                        minLength: 1,
-                                        type: 'string',
-                                      },
-                                    },
-                                    required: [
-                                      'kind',
-                                      'path',
-                                    ],
-                                    type: 'object',
-                                  },
-                                ],
-                              },
-                              type: {
-                                const: 'video',
-                                type: 'string',
-                              },
-                            },
-                            required: [
-                              'type',
-                              'source',
-                            ],
-                            type: 'object',
-                          },
-                          {
-                            properties: {
-                              file_id: {
-                                minLength: 1,
-                                type: 'string',
-                              },
-                              media_type: {
-                                minLength: 1,
-                                type: 'string',
-                              },
-                              name: {
-                                type: 'string',
-                              },
-                              path: {
-                                minLength: 1,
-                                type: 'string',
-                              },
-                              size: {
-                                maximum: 9007199254740991,
-                                minimum: 0,
-                                type: 'integer',
-                              },
-                              type: {
-                                const: 'file',
-                                type: 'string',
-                              },
-                            },
-                            required: [
-                              'type',
-                            ],
-                            type: 'object',
-                          },
-                          {
-                            properties: {
-                              signature: {
-                                type: 'string',
-                              },
-                              thinking: {
-                                type: 'string',
-                              },
-                              type: {
-                                const: 'thinking',
-                                type: 'string',
-                              },
-                            },
-                            required: [
-                              'type',
-                              'thinking',
-                            ],
-                            type: 'object',
-                          },
-                        ],
-                      },
-                      type: 'array',
-                    },
-                    promptIds: {
-                      items: {
-                        type: 'string',
-                      },
-                      type: 'array',
-                    },
-                    steeredAt: {
-                      type: 'string',
-                    },
-                    type: {
-                      const: 'prompt.steered',
-                      type: 'string',
-                    },
-                  },
-                  required: [
-                    'type',
-                    'agentId',
-                    'activePromptId',
-                    'promptIds',
-                    'content',
-                    'steeredAt',
-                  ],
-                  type: 'object',
-                },
-              ],
-            },
-            {
-              properties: {
-                agentId: {
-                  type: 'string',
-                },
-                sessionId: {
-                  type: 'string',
-                },
-              },
-              required: [
-                'agentId',
-                'sessionId',
-              ],
-              type: 'object',
-            },
-          ],
-        },
-        seq: {
-          maximum: 9007199254740991,
-          minimum: 0,
-          type: 'integer',
-        },
-        session_id: {
-          type: 'string',
-        },
-        timestamp: {
-          type: 'string',
-        },
-        type: {
-          type: 'string',
-        },
-        volatile: {
-          type: 'boolean',
-        },
-      },
-      required: [
-        'type',
-        'seq',
-        'timestamp',
-        'payload',
-      ],
-      type: 'object',
-    },
-  },
-  {
-    name: 'subscribe',
-    title: 'Subscribe',
-    summary: 'Subscribe the connection to one or more session event streams.',
-    direction: 'client_to_server',
-    payload: {
-      properties: {
-        id: {
-          type: 'string',
-        },
-        payload: {
-          properties: {
-            agent_filter: {
-              additionalProperties: {
-                items: {
-                  type: 'string',
-                },
-                minItems: 1,
                 type: 'array',
               },
-              propertyNames: {
-                type: 'string',
-              },
-              type: 'object',
-            },
-            cursors: {
-              additionalProperties: {
-                properties: {
-                  epoch: {
-                    minLength: 1,
-                    type: 'string',
-                  },
-                  seq: {
-                    maximum: 9007199254740991,
-                    minimum: 0,
-                    type: 'integer',
-                  },
-                },
-                required: [
-                  'seq',
-                ],
-                type: 'object',
-              },
-              propertyNames: {
-                type: 'string',
-              },
-              type: 'object',
-            },
-            session_ids: {
-              items: {
-                type: 'string',
-              },
-              type: 'array',
-            },
-            watch_fs: {
-              additionalProperties: {
-                properties: {
-                  paths: {
-                    items: {
-                      type: 'string',
-                    },
-                    type: 'array',
-                  },
-                  recursive: {
-                    type: 'boolean',
-                  },
-                },
-                required: [
-                  'paths',
-                ],
-                type: 'object',
-              },
-              propertyNames: {
-                type: 'string',
-              },
-              type: 'object',
-            },
-          },
-          required: [
-            'session_ids',
-          ],
-          type: 'object',
-        },
-        type: {
-          const: 'subscribe',
-          type: 'string',
-        },
-      },
-      required: [
-        'type',
-        'id',
-        'payload',
-      ],
-      type: 'object',
-    },
-  },
-  {
-    name: 'subscribe_v2',
-    title: 'Subscribe V2',
-    summary: 'Attach or update this connection\'s per-agent transcript grade stream for one session.',
-    direction: 'client_to_server',
-    payload: {
-      properties: {
-        id: {
-          type: 'string',
-        },
-        payload: {
-          properties: {
-            session_id: {
-              minLength: 1,
-              type: 'string',
-            },
-            transcript: {
-              additionalProperties: {
+              kind: {
                 enum: [
-                  'off',
-                  'turn',
-                  'block',
-                  'delta',
+                  'agent',
+                  'system',
                 ],
                 type: 'string',
               },
-              propertyNames: {
-                type: 'string',
-              },
-              type: 'object',
-            },
-            transcript_since: {
-              additionalProperties: {
+              ordinal: {
                 maximum: 9007199254740991,
                 minimum: 0,
                 type: 'integer',
               },
-              propertyNames: {
+              outcome: {
+                enum: [
+                  'completed',
+                  'interrupted',
+                  'failed',
+                ],
                 type: 'string',
               },
-              type: 'object',
-            },
-          },
-          required: [
-            'session_id',
-            'transcript',
-          ],
-          type: 'object',
-        },
-        type: {
-          const: 'subscribe_v2',
-          type: 'string',
-        },
-      },
-      required: [
-        'type',
-        'id',
-        'payload',
-      ],
-      type: 'object',
-    },
-  },
-  {
-    name: 'subscribe_v2.ack',
-    title: 'Subscribe V2 Ack',
-    summary: 'Acknowledgement for subscribe_v2.',
-    direction: 'server_to_client',
-    payload: {
-      properties: {
-        code: {
-          maximum: 9007199254740991,
-          minimum: -9007199254740991,
-          type: 'integer',
-        },
-        id: {
-          type: 'string',
-        },
-        msg: {
-          type: 'string',
-        },
-        payload: {
-          properties: {
-            accepted: {
-              items: {
-                type: 'string',
-              },
-              type: 'array',
-            },
-            cursors: {
-              additionalProperties: {
+              retry: {
                 properties: {
-                  epoch: {
-                    minLength: 1,
-                    type: 'string',
-                  },
-                  seq: {
+                  attempt: {
+                    exclusiveMinimum: 0,
                     maximum: 9007199254740991,
+                    type: 'integer',
+                  },
+                  delay_ms: {
                     minimum: 0,
+                    type: 'number',
+                  },
+                  error: {
+                    properties: {
+                      message: {
+                        type: 'string',
+                      },
+                      name: {
+                        type: 'string',
+                      },
+                      status_code: {
+                        maximum: 9007199254740991,
+                        minimum: -9007199254740991,
+                        type: 'integer',
+                      },
+                    },
+                    required: [
+                      'name',
+                      'message',
+                    ],
+                    type: 'object',
+                  },
+                  max_attempts: {
+                    exclusiveMinimum: 0,
+                    maximum: 9007199254740991,
+                    type: 'integer',
+                  },
+                  next_attempt: {
+                    exclusiveMinimum: 0,
+                    maximum: 9007199254740991,
                     type: 'integer',
                   },
                 },
                 required: [
-                  'seq',
+                  'attempt',
+                  'next_attempt',
+                  'max_attempts',
+                  'delay_ms',
+                  'error',
                 ],
                 type: 'object',
               },
-              propertyNames: {
+              started_at: {
                 type: 'string',
               },
-              type: 'object',
-            },
-            not_found: {
-              items: {
+              status: {
+                enum: [
+                  'running',
+                  'ended',
+                ],
                 type: 'string',
               },
-              type: 'array',
-            },
-            resync_required: {
-              items: {
-                type: 'string',
-              },
-              type: 'array',
-            },
-          },
-          required: [
-            'accepted',
-            'not_found',
-            'resync_required',
-          ],
-          type: 'object',
-        },
-        type: {
-          const: 'ack',
-          type: 'string',
-        },
-      },
-      required: [
-        'type',
-        'id',
-        'code',
-        'msg',
-        'payload',
-      ],
-      type: 'object',
-    },
-  },
-  {
-    name: 'subscribe.ack',
-    title: 'Subscribe Ack',
-    summary: 'Acknowledgement for subscribe.',
-    direction: 'server_to_client',
-    payload: {
-      properties: {
-        code: {
-          maximum: 9007199254740991,
-          minimum: -9007199254740991,
-          type: 'integer',
-        },
-        id: {
-          type: 'string',
-        },
-        msg: {
-          type: 'string',
-        },
-        payload: {
-          properties: {
-            accepted: {
-              items: {
-                type: 'string',
-              },
-              type: 'array',
-            },
-            cursors: {
-              additionalProperties: {
-                properties: {
-                  epoch: {
-                    minLength: 1,
-                    type: 'string',
+              steps: {
+                items: {
+                  properties: {
+                    ended_at: {
+                      type: 'string',
+                    },
+                    finish_reason: {
+                      type: 'string',
+                    },
+                    index: {
+                      exclusiveMinimum: 0,
+                      maximum: 9007199254740991,
+                      type: 'integer',
+                    },
+                    outcome: {
+                      enum: [
+                        'completed',
+                        'interrupted',
+                        'failed',
+                      ],
+                      type: 'string',
+                    },
+                    started_at: {
+                      type: 'string',
+                    },
+                    usage: {
+                      properties: {
+                        input_cache_creation: {
+                          minimum: 0,
+                          type: 'number',
+                        },
+                        input_cache_read: {
+                          minimum: 0,
+                          type: 'number',
+                        },
+                        input_other: {
+                          minimum: 0,
+                          type: 'number',
+                        },
+                        output: {
+                          minimum: 0,
+                          type: 'number',
+                        },
+                      },
+                      required: [
+                        'input_other',
+                        'output',
+                        'input_cache_read',
+                        'input_cache_creation',
+                      ],
+                      type: 'object',
+                    },
                   },
-                  seq: {
-                    maximum: 9007199254740991,
+                  required: [
+                    'index',
+                    'outcome',
+                    'started_at',
+                  ],
+                  type: 'object',
+                },
+                type: 'array',
+              },
+              turn_id: {
+                minLength: 1,
+                type: 'string',
+              },
+              turn_number: {
+                maximum: 9007199254740991,
+                minimum: 0,
+                type: 'integer',
+              },
+              usage: {
+                properties: {
+                  input_cache_creation: {
                     minimum: 0,
-                    type: 'integer',
+                    type: 'number',
+                  },
+                  input_cache_read: {
+                    minimum: 0,
+                    type: 'number',
+                  },
+                  input_other: {
+                    minimum: 0,
+                    type: 'number',
+                  },
+                  output: {
+                    minimum: 0,
+                    type: 'number',
                   },
                 },
                 required: [
-                  'seq',
+                  'input_other',
+                  'output',
+                  'input_cache_read',
+                  'input_cache_creation',
                 ],
                 type: 'object',
               },
-              propertyNames: {
-                type: 'string',
-              },
-              type: 'object',
             },
-            not_found: {
-              items: {
-                type: 'string',
-              },
-              type: 'array',
-            },
-            resync_required: {
-              items: {
-                type: 'string',
-              },
-              type: 'array',
-            },
+            required: [
+              'turn_id',
+              'ordinal',
+              'kind',
+              'status',
+              'started_at',
+              'steps',
+              'items',
+            ],
+            type: 'object',
           },
-          required: [
-            'accepted',
-            'not_found',
-            'resync_required',
-          ],
-          type: 'object',
+          type: 'array',
         },
         type: {
-          const: 'ack',
+          const: 'turns',
           type: 'string',
         },
       },
       required: [
+        'turns',
+        'has_more',
         'type',
-        'id',
-        'code',
-        'msg',
-        'payload',
+        'session_id',
+        'agent_id',
+        'event_created_at',
       ],
       type: 'object',
     },
   },
   {
-    name: 'terminal_attach',
-    title: 'Terminal Attach',
-    summary: 'Attach this connection to a terminal stream.',
-    direction: 'client_to_server',
-    payload: {
-      properties: {
-        id: {
-          type: 'string',
-        },
-        payload: {
-          properties: {
-            session_id: {
-              minLength: 1,
-              type: 'string',
-            },
-            since_seq: {
-              maximum: 9007199254740991,
-              minimum: 0,
-              type: 'integer',
-            },
-            terminal_id: {
-              minLength: 1,
-              type: 'string',
-            },
-          },
-          required: [
-            'session_id',
-            'terminal_id',
-          ],
-          type: 'object',
-        },
-        type: {
-          const: 'terminal_attach',
-          type: 'string',
-        },
-      },
-      required: [
-        'type',
-        'id',
-        'payload',
-      ],
-      type: 'object',
-    },
-  },
-  {
-    name: 'terminal_attach.ack',
-    title: 'Terminal Attach Ack',
-    summary: 'Acknowledgement for terminal_attach.',
+    name: 'turns.failed',
+    title: 'Turns Failed',
+    summary: 'The conversation of a subscribed agent could not be loaded; code and msg say why. The agent stays subscribed, and a later turns frame replaces the failure.',
     direction: 'server_to_client',
     payload: {
       properties: {
+        agent_id: {
+          minLength: 1,
+          type: 'string',
+        },
         code: {
           maximum: 9007199254740991,
           minimum: -9007199254740991,
           type: 'integer',
         },
-        id: {
+        event_created_at: {
           type: 'string',
         },
         msg: {
           type: 'string',
         },
-        payload: {
-          properties: {
-            attached: {
-              const: true,
-              type: 'boolean',
-            },
-            replayed: {
-              maximum: 9007199254740991,
-              minimum: 0,
-              type: 'integer',
-            },
-          },
-          required: [
-            'attached',
-            'replayed',
-          ],
-          type: 'object',
+        session_id: {
+          minLength: 1,
+          type: 'string',
         },
         type: {
-          const: 'ack',
+          const: 'turns.failed',
           type: 'string',
         },
       },
       required: [
         'type',
-        'id',
+        'session_id',
+        'agent_id',
+        'event_created_at',
         'code',
         'msg',
-        'payload',
       ],
       type: 'object',
     },
   },
   {
-    name: 'terminal_close',
-    title: 'Terminal Close',
-    summary: 'Close a terminal.',
-    direction: 'client_to_server',
-    payload: {
-      properties: {
-        id: {
-          type: 'string',
-        },
-        payload: {
-          properties: {
-            session_id: {
-              minLength: 1,
-              type: 'string',
-            },
-            terminal_id: {
-              minLength: 1,
-              type: 'string',
-            },
-          },
-          required: [
-            'session_id',
-            'terminal_id',
-          ],
-          type: 'object',
-        },
-        type: {
-          const: 'terminal_close',
-          type: 'string',
-        },
-      },
-      required: [
-        'type',
-        'id',
-        'payload',
-      ],
-      type: 'object',
-    },
-  },
-  {
-    name: 'terminal_close.ack',
-    title: 'Terminal Close Ack',
-    summary: 'Acknowledgement for terminal_close.',
+    name: 'turns.removed',
+    title: 'Turns Removed',
+    summary: 'Turns that left the conversation of an agent, in ordinal order: the undone turns after an undo, matching removed_turn_ids of the undo response, or every turn after a context clear. The client removes them by turn_id.',
     direction: 'server_to_client',
     payload: {
       properties: {
-        code: {
-          maximum: 9007199254740991,
-          minimum: -9007199254740991,
-          type: 'integer',
-        },
-        id: {
+        agent_id: {
+          minLength: 1,
           type: 'string',
         },
-        msg: {
+        event_created_at: {
           type: 'string',
         },
-        payload: {
-          properties: {
-            closed: {
-              const: true,
-              type: 'boolean',
-            },
+        session_id: {
+          minLength: 1,
+          type: 'string',
+        },
+        turn_ids: {
+          items: {
+            minLength: 1,
+            type: 'string',
           },
-          required: [
-            'closed',
-          ],
-          type: 'object',
+          type: 'array',
         },
         type: {
-          const: 'ack',
+          const: 'turns.removed',
           type: 'string',
         },
       },
       required: [
         'type',
-        'id',
-        'code',
-        'msg',
-        'payload',
-      ],
-      type: 'object',
-    },
-  },
-  {
-    name: 'terminal_detach',
-    title: 'Terminal Detach',
-    summary: 'Detach this connection from a terminal stream.',
-    direction: 'client_to_server',
-    payload: {
-      properties: {
-        id: {
-          type: 'string',
-        },
-        payload: {
-          properties: {
-            session_id: {
-              minLength: 1,
-              type: 'string',
-            },
-            terminal_id: {
-              minLength: 1,
-              type: 'string',
-            },
-          },
-          required: [
-            'session_id',
-            'terminal_id',
-          ],
-          type: 'object',
-        },
-        type: {
-          const: 'terminal_detach',
-          type: 'string',
-        },
-      },
-      required: [
-        'type',
-        'id',
-        'payload',
-      ],
-      type: 'object',
-    },
-  },
-  {
-    name: 'terminal_detach.ack',
-    title: 'Terminal Detach Ack',
-    summary: 'Acknowledgement for terminal_detach.',
-    direction: 'server_to_client',
-    payload: {
-      properties: {
-        code: {
-          maximum: 9007199254740991,
-          minimum: -9007199254740991,
-          type: 'integer',
-        },
-        id: {
-          type: 'string',
-        },
-        msg: {
-          type: 'string',
-        },
-        payload: {
-          properties: {
-            detached: {
-              const: true,
-              type: 'boolean',
-            },
-          },
-          required: [
-            'detached',
-          ],
-          type: 'object',
-        },
-        type: {
-          const: 'ack',
-          type: 'string',
-        },
-      },
-      required: [
-        'type',
-        'id',
-        'code',
-        'msg',
-        'payload',
-      ],
-      type: 'object',
-    },
-  },
-  {
-    name: 'terminal_input',
-    title: 'Terminal Input',
-    summary: 'Write raw input bytes to a terminal.',
-    direction: 'client_to_server',
-    payload: {
-      properties: {
-        id: {
-          type: 'string',
-        },
-        payload: {
-          properties: {
-            data: {
-              type: 'string',
-            },
-            session_id: {
-              minLength: 1,
-              type: 'string',
-            },
-            terminal_id: {
-              minLength: 1,
-              type: 'string',
-            },
-          },
-          required: [
-            'session_id',
-            'terminal_id',
-            'data',
-          ],
-          type: 'object',
-        },
-        type: {
-          const: 'terminal_input',
-          type: 'string',
-        },
-      },
-      required: [
-        'type',
-        'id',
-        'payload',
-      ],
-      type: 'object',
-    },
-  },
-  {
-    name: 'terminal_input.ack',
-    title: 'Terminal Input Ack',
-    summary: 'Acknowledgement for terminal_input.',
-    direction: 'server_to_client',
-    payload: {
-      properties: {
-        code: {
-          maximum: 9007199254740991,
-          minimum: -9007199254740991,
-          type: 'integer',
-        },
-        id: {
-          type: 'string',
-        },
-        msg: {
-          type: 'string',
-        },
-        payload: {
-          properties: {
-            accepted: {
-              const: true,
-              type: 'boolean',
-            },
-          },
-          required: [
-            'accepted',
-          ],
-          type: 'object',
-        },
-        type: {
-          const: 'ack',
-          type: 'string',
-        },
-      },
-      required: [
-        'type',
-        'id',
-        'code',
-        'msg',
-        'payload',
-      ],
-      type: 'object',
-    },
-  },
-  {
-    name: 'terminal_resize',
-    title: 'Terminal Resize',
-    summary: 'Resize a terminal.',
-    direction: 'client_to_server',
-    payload: {
-      properties: {
-        id: {
-          type: 'string',
-        },
-        payload: {
-          properties: {
-            cols: {
-              exclusiveMinimum: 0,
-              maximum: 9007199254740991,
-              type: 'integer',
-            },
-            rows: {
-              exclusiveMinimum: 0,
-              maximum: 9007199254740991,
-              type: 'integer',
-            },
-            session_id: {
-              minLength: 1,
-              type: 'string',
-            },
-            terminal_id: {
-              minLength: 1,
-              type: 'string',
-            },
-          },
-          required: [
-            'session_id',
-            'terminal_id',
-            'cols',
-            'rows',
-          ],
-          type: 'object',
-        },
-        type: {
-          const: 'terminal_resize',
-          type: 'string',
-        },
-      },
-      required: [
-        'type',
-        'id',
-        'payload',
-      ],
-      type: 'object',
-    },
-  },
-  {
-    name: 'terminal_resize.ack',
-    title: 'Terminal Resize Ack',
-    summary: 'Acknowledgement for terminal_resize.',
-    direction: 'server_to_client',
-    payload: {
-      properties: {
-        code: {
-          maximum: 9007199254740991,
-          minimum: -9007199254740991,
-          type: 'integer',
-        },
-        id: {
-          type: 'string',
-        },
-        msg: {
-          type: 'string',
-        },
-        payload: {
-          properties: {
-            resized: {
-              const: true,
-              type: 'boolean',
-            },
-          },
-          required: [
-            'resized',
-          ],
-          type: 'object',
-        },
-        type: {
-          const: 'ack',
-          type: 'string',
-        },
-      },
-      required: [
-        'type',
-        'id',
-        'code',
-        'msg',
-        'payload',
+        'session_id',
+        'agent_id',
+        'event_created_at',
+        'turn_ids',
       ],
       type: 'object',
     },
@@ -6820,26 +5401,25 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
   {
     name: 'unsubscribe',
     title: 'Unsubscribe',
-    summary: 'Remove one or more session event stream subscriptions.',
+    summary: 'Stop receiving agents of one session; without agent_ids the whole session is dropped.',
     direction: 'client_to_server',
     payload: {
       properties: {
-        id: {
+        agent_ids: {
+          items: {
+            minLength: 1,
+            type: 'string',
+          },
+          minItems: 1,
+          type: 'array',
+        },
+        request_id: {
+          minLength: 1,
           type: 'string',
         },
-        payload: {
-          properties: {
-            session_ids: {
-              items: {
-                type: 'string',
-              },
-              type: 'array',
-            },
-          },
-          required: [
-            'session_ids',
-          ],
-          type: 'object',
+        session_id: {
+          minLength: 1,
+          type: 'string',
         },
         type: {
           const: 'unsubscribe',
@@ -6848,410 +5428,8 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
       },
       required: [
         'type',
-        'id',
-        'payload',
-      ],
-      type: 'object',
-    },
-  },
-  {
-    name: 'unsubscribe_v2',
-    title: 'Unsubscribe V2',
-    summary: 'Detach this connection\'s transcript grade stream for one session, optionally per agent.',
-    direction: 'client_to_server',
-    payload: {
-      properties: {
-        id: {
-          type: 'string',
-        },
-        payload: {
-          properties: {
-            agent_ids: {
-              items: {
-                minLength: 1,
-                type: 'string',
-              },
-              minItems: 1,
-              type: 'array',
-            },
-            session_id: {
-              minLength: 1,
-              type: 'string',
-            },
-          },
-          required: [
-            'session_id',
-          ],
-          type: 'object',
-        },
-        type: {
-          const: 'unsubscribe_v2',
-          type: 'string',
-        },
-      },
-      required: [
-        'type',
-        'id',
-        'payload',
-      ],
-      type: 'object',
-    },
-  },
-  {
-    name: 'unsubscribe_v2.ack',
-    title: 'Unsubscribe V2 Ack',
-    summary: 'Acknowledgement for unsubscribe_v2.',
-    direction: 'server_to_client',
-    payload: {
-      properties: {
-        code: {
-          maximum: 9007199254740991,
-          minimum: -9007199254740991,
-          type: 'integer',
-        },
-        id: {
-          type: 'string',
-        },
-        msg: {
-          type: 'string',
-        },
-        payload: {
-          properties: {
-            accepted: {
-              items: {
-                type: 'string',
-              },
-              type: 'array',
-            },
-            cursors: {
-              additionalProperties: {
-                properties: {
-                  epoch: {
-                    minLength: 1,
-                    type: 'string',
-                  },
-                  seq: {
-                    maximum: 9007199254740991,
-                    minimum: 0,
-                    type: 'integer',
-                  },
-                },
-                required: [
-                  'seq',
-                ],
-                type: 'object',
-              },
-              propertyNames: {
-                type: 'string',
-              },
-              type: 'object',
-            },
-            not_found: {
-              items: {
-                type: 'string',
-              },
-              type: 'array',
-            },
-            resync_required: {
-              items: {
-                type: 'string',
-              },
-              type: 'array',
-            },
-          },
-          required: [
-            'accepted',
-            'not_found',
-            'resync_required',
-          ],
-          type: 'object',
-        },
-        type: {
-          const: 'ack',
-          type: 'string',
-        },
-      },
-      required: [
-        'type',
-        'id',
-        'code',
-        'msg',
-        'payload',
-      ],
-      type: 'object',
-    },
-  },
-  {
-    name: 'unsubscribe.ack',
-    title: 'Unsubscribe Ack',
-    summary: 'Acknowledgement for unsubscribe.',
-    direction: 'server_to_client',
-    payload: {
-      properties: {
-        code: {
-          maximum: 9007199254740991,
-          minimum: -9007199254740991,
-          type: 'integer',
-        },
-        id: {
-          type: 'string',
-        },
-        msg: {
-          type: 'string',
-        },
-        payload: {
-          properties: {
-            accepted: {
-              items: {
-                type: 'string',
-              },
-              type: 'array',
-            },
-            cursors: {
-              additionalProperties: {
-                properties: {
-                  epoch: {
-                    minLength: 1,
-                    type: 'string',
-                  },
-                  seq: {
-                    maximum: 9007199254740991,
-                    minimum: 0,
-                    type: 'integer',
-                  },
-                },
-                required: [
-                  'seq',
-                ],
-                type: 'object',
-              },
-              propertyNames: {
-                type: 'string',
-              },
-              type: 'object',
-            },
-            not_found: {
-              items: {
-                type: 'string',
-              },
-              type: 'array',
-            },
-            resync_required: {
-              items: {
-                type: 'string',
-              },
-              type: 'array',
-            },
-          },
-          required: [
-            'accepted',
-            'not_found',
-            'resync_required',
-          ],
-          type: 'object',
-        },
-        type: {
-          const: 'ack',
-          type: 'string',
-        },
-      },
-      required: [
-        'type',
-        'id',
-        'code',
-        'msg',
-        'payload',
-      ],
-      type: 'object',
-    },
-  },
-  {
-    name: 'watch_fs_add',
-    title: 'Watch Fs Add',
-    summary: 'Add filesystem watch paths for a subscribed session.',
-    direction: 'client_to_server',
-    payload: {
-      properties: {
-        id: {
-          type: 'string',
-        },
-        payload: {
-          properties: {
-            paths: {
-              items: {
-                type: 'string',
-              },
-              type: 'array',
-            },
-            recursive: {
-              type: 'boolean',
-            },
-            runtime_id: {
-              minLength: 1,
-              type: 'string',
-            },
-            session_id: {
-              type: 'string',
-            },
-          },
-          required: [
-            'session_id',
-            'paths',
-          ],
-          type: 'object',
-        },
-        type: {
-          const: 'watch_fs_add',
-          type: 'string',
-        },
-      },
-      required: [
-        'type',
-        'id',
-        'payload',
-      ],
-      type: 'object',
-    },
-  },
-  {
-    name: 'watch_fs_add.ack',
-    title: 'Watch Fs Add Ack',
-    summary: 'Acknowledgement for watch_fs_add.',
-    direction: 'server_to_client',
-    payload: {
-      properties: {
-        code: {
-          maximum: 9007199254740991,
-          minimum: -9007199254740991,
-          type: 'integer',
-        },
-        id: {
-          type: 'string',
-        },
-        msg: {
-          type: 'string',
-        },
-        payload: {
-          properties: {
-            current_count: {
-              maximum: 9007199254740991,
-              minimum: 0,
-              type: 'integer',
-            },
-            watched_paths: {
-              items: {
-                type: 'string',
-              },
-              type: 'array',
-            },
-          },
-          type: 'object',
-        },
-        type: {
-          const: 'ack',
-          type: 'string',
-        },
-      },
-      required: [
-        'type',
-        'id',
-        'code',
-        'msg',
-        'payload',
-      ],
-      type: 'object',
-    },
-  },
-  {
-    name: 'watch_fs_remove',
-    title: 'Watch Fs Remove',
-    summary: 'Remove filesystem watch paths for a subscribed session.',
-    direction: 'client_to_server',
-    payload: {
-      properties: {
-        id: {
-          type: 'string',
-        },
-        payload: {
-          properties: {
-            paths: {
-              items: {
-                type: 'string',
-              },
-              type: 'array',
-            },
-            runtime_id: {
-              minLength: 1,
-              type: 'string',
-            },
-            session_id: {
-              type: 'string',
-            },
-          },
-          required: [
-            'session_id',
-            'paths',
-          ],
-          type: 'object',
-        },
-        type: {
-          const: 'watch_fs_remove',
-          type: 'string',
-        },
-      },
-      required: [
-        'type',
-        'id',
-        'payload',
-      ],
-      type: 'object',
-    },
-  },
-  {
-    name: 'watch_fs_remove.ack',
-    title: 'Watch Fs Remove Ack',
-    summary: 'Acknowledgement for watch_fs_remove.',
-    direction: 'server_to_client',
-    payload: {
-      properties: {
-        code: {
-          maximum: 9007199254740991,
-          minimum: -9007199254740991,
-          type: 'integer',
-        },
-        id: {
-          type: 'string',
-        },
-        msg: {
-          type: 'string',
-        },
-        payload: {
-          properties: {
-            current_count: {
-              maximum: 9007199254740991,
-              minimum: 0,
-              type: 'integer',
-            },
-            watched_paths: {
-              items: {
-                type: 'string',
-              },
-              type: 'array',
-            },
-          },
-          type: 'object',
-        },
-        type: {
-          const: 'ack',
-          type: 'string',
-        },
-      },
-      required: [
-        'type',
-        'id',
-        'code',
-        'msg',
-        'payload',
+        'request_id',
+        'session_id',
       ],
       type: 'object',
     },
