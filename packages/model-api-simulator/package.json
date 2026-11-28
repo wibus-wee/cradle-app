@@ -14,8 +14,8 @@
   "dependencies": {
     "ajv": "^8.20.0",
     "ajv-formats": "^3.0.1",
-    "elysia": "^1.4.30",
-    "srvx": "^0.12.7"
+    "elysia": "^1.4.32",
+    "srvx": "^1.0.8"
   },
   "devDependencies": {
     "@types/node": "^22.20.1",
