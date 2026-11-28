@@ -32,6 +32,8 @@ server: &server
   - *ci
   - *shared
   - 'apps/server/**'
+  - 'vendor/model-api-simulator'
+  - 'vendor/model-api-simulator/**'
 
 desktop: &desktop
   - *ci
@@ -49,6 +51,8 @@ build_desktop:
 simulator:
   - *ci
   - 'packages/model-api-simulator/**'
+  - 'vendor/model-api-simulator'
+  - 'vendor/model-api-simulator/**'
 
 mobile:
   - *ci
@@ -87,6 +91,8 @@ e2e:
   - *toolchain
   - *shared
   - 'e2e/**'
+  - 'vendor/model-api-simulator'
+  - 'vendor/model-api-simulator/**'
   - 'apps/web/**'
   - 'apps/server/**'
   - 'apps/desktop/**'

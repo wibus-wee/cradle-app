@@ -1,0 +1,3 @@
+[submodule "vendor/model-api-simulator"]
+	path = vendor/model-api-simulator
+	url = https://github.com/wibus-wee/model-api-simulator.git

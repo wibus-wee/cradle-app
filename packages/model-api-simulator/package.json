@@ -9,29 +9,16 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "scripts": {
-    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
-    "test": "vitest run --config vitest.config.ts",
-    "protocol:refresh:openai": "tsx scripts/refresh-openai-protocol.ts",
-    "protocol:refresh:anthropic": "tsx scripts/refresh-anthropic-protocol.ts",
-    "protocol:generate": "tsx scripts/generate-protocol-artifacts.ts",
-    "protocol:check": "tsx scripts/check-protocol-artifacts.ts",
-    "coverage:check": "tsx scripts/check-protocol-coverage.ts"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "ajv": "^8.20.0",
     "ajv-formats": "^3.0.1",
-    "elysia": "^1.4.30",
-    "srvx": "^0.12.7"
+    "elysia": "^1.4.32",
+    "srvx": "^1.0.8"
   },
   "devDependencies": {
     "@types/node": "^22.20.1",
-    "anthropic-sdk-0-115": "npm:@anthropic-ai/sdk@0.115.0",
-    "fast-check": "^4.9.0",
-    "openai": "7.8.0",
-    "ts-json-schema-generator": "^2.9.0",
-    "tsx": "^4.23.13",
-    "typescript": "^6.0.3",
-    "vitest": "^4.1.11",
-    "yaml": "^2.9.0"
+    "typescript": "^6.0.3"
   }
 }

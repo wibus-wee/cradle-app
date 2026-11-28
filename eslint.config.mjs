@@ -26,6 +26,7 @@ export default defineConfig(
       '**/*.{md,mdx,json,jsonc,json5,yaml,yml}',
       'packages/cli/**',
       'packages/db/drizzle/**',
+      'vendor/**',
     ],
   },
   {
