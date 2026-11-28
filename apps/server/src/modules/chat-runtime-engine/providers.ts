@@ -1,7 +1,7 @@
 // AI SDK provider factory — creates LanguageModel instances from provider config
 
 import { createAnthropic } from '@ai-sdk/anthropic'
-import { createGoogleGenerativeAI } from '@ai-sdk/google'
+import { createGoogle } from '@ai-sdk/google'
 import { createOpenAI } from '@ai-sdk/openai'
 import type { LanguageModel } from 'ai'
 
@@ -63,7 +63,7 @@ export function createLanguageModel(config: ModelConfig): LanguageModel {
       return provider(config.modelId)
     }
     case 'google': {
-      const provider = createGoogleGenerativeAI({
+      const provider = createGoogle({
         apiKey: config.apiKey,
         baseURL: config.baseUrl,
       })

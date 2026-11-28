@@ -2,6 +2,7 @@ import { trace } from '@opentelemetry/api'
 import { HostMetrics } from '@opentelemetry/host-metrics'
 import { NodeSDK } from '@opentelemetry/sdk-node'
 
+import { registerAiSdkTelemetry } from './ai-sdk-registration'
 import type { TelemetryConfig } from './config'
 import { createMetricReaders, createTraceSpanProcessors } from './exporters'
 import { createTelemetryInstrumentations } from './instrumentation'
@@ -35,6 +36,7 @@ export function startTelemetrySdk(config: TelemetryConfig): void {
   })
   sdk.start()
   bindLangfuseTracerProvider(trace.getTracerProvider())
+  registerAiSdkTelemetry()
 
   if (config.metricsEnabled) {
     initializeCradleMetrics()

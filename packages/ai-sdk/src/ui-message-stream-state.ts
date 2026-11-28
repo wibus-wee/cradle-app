@@ -1,4 +1,4 @@
-import type { ProviderMetadata, UIMessage, UIMessageChunk } from 'ai'
+import type { Citation, ProviderMetadata, UIMessage, UIMessageChunk } from 'ai'
 import { parsePartialJson } from 'ai'
 
 const SNAPSHOT_CHUNK_TYPE = 'data-cradle-stream-snapshot' as const
@@ -90,7 +90,7 @@ export function applyUIMessageChunk(target: UIMessageStreamTarget, chunk: UIMess
       appendTextDelta(state.activeTextParts, chunk.id, chunk.delta, chunk.providerMetadata)
       return
     case 'text-end':
-      finishTextPart(state.activeTextParts, chunk.id, chunk.providerMetadata)
+      finishTextPart(state.activeTextParts, chunk.id, chunk.providerMetadata, chunk.citations)
       return
     case 'reasoning-start':
       startTextPart(message, state.activeReasoningParts, chunk.id, 'reasoning', chunk.providerMetadata)
@@ -179,6 +179,60 @@ export function applyUIMessageChunk(target: UIMessageStreamTarget, chunk: UIMess
     case 'tool-output-denied':
       updateToolPart(message, chunk.toolCallId, { state: 'output-denied' })
       return
+    case 'tool-approval-response': {
+      // Wire chunks carry the approvalId, not the toolCallId; resolve the
+      // part through the approval id recorded by 'tool-approval-request'.
+      const part = message.parts.find(
+        (candidate): candidate is MutableToolPart =>
+          'toolCallId' in candidate
+          && typeof candidate === 'object'
+          && candidate !== null
+          && 'approval' in candidate
+          && typeof candidate.approval === 'object'
+          && candidate.approval !== null
+          && (candidate.approval as { id?: string }).id === chunk.approvalId,
+      )
+      if (part) {
+        const existing = 'approval' in part && typeof part.approval === 'object' && part.approval !== null
+          ? part.approval as Record<string, unknown>
+          : {}
+        Object.assign(part as object, {
+          state: 'approval-responded',
+          approval: {
+            ...existing,
+            id: chunk.approvalId,
+            approved: chunk.approved,
+            ...(chunk.reason !== undefined ? { reason: chunk.reason } : {}),
+          },
+        })
+      }
+      return
+    }
+    case 'custom':
+      message.parts.push({
+        type: 'custom',
+        kind: chunk.kind,
+        ...(chunk.providerMetadata ? { providerMetadata: chunk.providerMetadata } : {}),
+      } as MessagePart)
+      return
+    case 'reasoning-file':
+      message.parts.push({
+        type: 'reasoning-file',
+        mediaType: chunk.mediaType,
+        url: chunk.url,
+        ...(chunk.providerMetadata ? { providerMetadata: chunk.providerMetadata } : {}),
+      } as MessagePart)
+      return
+    case 'steering-message':
+      message.parts.push({
+        type: 'steering-message',
+        id: chunk.id,
+        parts: chunk.parts,
+      } as MessagePart)
+      return
+    case 'reset-step':
+      rollbackCurrentStep(message, state)
+      return
     case 'start-step':
       message.parts.push({ type: 'step-start' })
       return
@@ -217,18 +271,22 @@ export function applyUIMessageChunk(target: UIMessageStreamTarget, chunk: UIMess
     case 'abort':
     case 'error':
       return
-    default:
-      if (chunk.type.startsWith('data-') && !chunk.transient) {
-        const existing = chunk.id
-          ? message.parts.find(part => part.type === chunk.type && 'id' in part && part.id === chunk.id)
+    default: {
+      // All concrete chunk types are handled above; what remains is the
+      // open-ended `data-${string}` family.
+      const dataChunk = chunk as Extract<UIMessageChunk, { type: `data-${string}` }>
+      if (dataChunk.type.startsWith('data-') && !dataChunk.transient) {
+        const existing = dataChunk.id
+          ? message.parts.find(part => part.type === dataChunk.type && 'id' in part && part.id === dataChunk.id)
           : undefined
         if (existing && 'data' in existing) {
-          existing.data = chunk.data
+          existing.data = dataChunk.data
         }
         else {
-          message.parts.push(chunk as MessagePart)
+          message.parts.push(dataChunk as MessagePart)
         }
       }
+    }
   }
 }
 
@@ -332,6 +390,25 @@ export function isUIMessageStreamSnapshotChunk(
     && 'snapshot' in chunk.data
 }
 
+/**
+ * Reset-step rollback: drop the parts accumulated for the current step
+ * (everything after the most recent 'step-start' boundary, or the whole
+ * message when no step has started) and discard in-flight stream state.
+ */
+function rollbackCurrentStep(message: UIMessage, state: UIMessageStreamState): void {
+  let boundary = -1
+  for (let index = message.parts.length - 1; index >= 0; index--) {
+    if (message.parts[index]!.type === 'step-start') {
+      boundary = index
+      break
+    }
+  }
+  message.parts.splice(boundary + 1)
+  state.activeTextParts.clear()
+  state.activeReasoningParts.clear()
+  state.partialToolCalls.clear()
+}
+
 function startTextPart(
   message: UIMessage,
   parts: Map<string, ActiveTextPart>,
@@ -367,6 +444,7 @@ function finishTextPart(
   parts: Map<string, ActiveTextPart>,
   id: string,
   providerMetadata?: ProviderMetadata,
+  citations?: Array<Citation>,
 ): void {
   const active = parts.get(id)
   if (!active) {
@@ -374,6 +452,9 @@ function finishTextPart(
   }
   flushTextPart(active)
   active.part.state = 'done'
+  if (citations && active.part.type === 'text') {
+    ;(active.part as Extract<MessagePart, { type: 'text' }>).citations = citations
+  }
   active.part.providerMetadata = providerMetadata ?? active.part.providerMetadata
   parts.delete(id)
 }

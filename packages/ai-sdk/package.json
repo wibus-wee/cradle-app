@@ -13,7 +13,7 @@
     "test": "vitest run --config vitest.config.ts"
   },
   "dependencies": {
-    "ai": "^6.0.168"
+    "ai": "^7.0.184"
   },
   "devDependencies": {
     "@types/node": "^22.20.1",

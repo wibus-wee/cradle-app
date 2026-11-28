@@ -21,20 +21,29 @@ describe('buildModelMessages', () => {
       ],
     }
 
-    await expect(buildModelMessages(undefined, userMessage)).resolves.toEqual([
-      {
-        role: 'user',
-        content: [
-          { type: 'text', text: 'Read this image' },
-          {
-            type: 'file',
-            mediaType: 'image/png',
-            filename: 'diagram.png',
-            data: 'data:image/png;base64,test',
-          },
-        ],
-      },
-    ])
+    const messages = await buildModelMessages(undefined, userMessage)
+
+    expect(messages).toHaveLength(1)
+    const [converted] = messages
+    expect(converted?.role).toBe('user')
+    const content = converted?.content
+    expect(Array.isArray(content)).toBe(true)
+    if (!Array.isArray(content)) {
+      throw new TypeError('expected array content')
+    }
+    expect(content[0]).toMatchObject({ type: 'text', text: 'Read this image' })
+    // AI SDK 7 canonicalizes file data into a tagged variant carrying a URL instance
+    const filePart = content[1] as {
+      type: string
+      mediaType?: string
+      filename?: string
+      data?: { type: string, url: URL }
+    }
+    expect(filePart.type).toBe('file')
+    expect(filePart.mediaType).toBe('image/png')
+    expect(filePart.filename).toBe('diagram.png')
+    expect(filePart.data?.type).toBe('url')
+    expect(filePart.data?.url?.href).toBe('data:image/png;base64,test')
   })
 
   it('degrades Cradle plugin context parts to text for AI SDK model messages', async () => {
