@@ -32,6 +32,7 @@ import type {
   ExternalSessionImportMessage,
   ExternalSessionReadResult,
   ExternalSessionSourceAdapter,
+  ExternalSessionSourceApp,
 } from './types'
 
 export type ExternalSessionImportItemStatus = 'imported' | 'duplicate' | 'error'
@@ -338,14 +339,14 @@ function persistImportedSession(
           sessionId: legacy.sessionId,
           workspaceId: workspace.id,
           title: source.descriptor.title,
-          runtimeKind: source.descriptor.sourceApp === 'codex' ? 'codex' : 'claude-agent',
+          runtimeKind: runtimeKindForSourceApp(source.descriptor.sourceApp),
           configJson,
           updatedAt,
         })
       : Session.createImportedSessionInTransaction(transaction, {
           workspaceId: workspace.id,
           title: source.descriptor.title,
-          runtimeKind: source.descriptor.sourceApp === 'codex' ? 'codex' : 'claude-agent',
+          runtimeKind: runtimeKindForSourceApp(source.descriptor.sourceApp),
           configJson,
           createdAt,
           updatedAt,
@@ -533,6 +534,11 @@ function findCurrentImport(descriptor: ExternalSessionDescriptor): {
 }
 
 function findLegacyImport(descriptor: ExternalSessionDescriptor): LegacyImport | null {
+  // Legacy external_work_import_items predate this module and only ever
+  // recorded claude/codex sessions; newer source apps cannot have legacy rows.
+  if (descriptor.sourceApp !== 'claude' && descriptor.sourceApp !== 'codex') {
+    return null
+  }
   const records = db()
     .select({
       id: externalWorkImportItems.id,
@@ -559,6 +565,23 @@ function findLegacyImport(descriptor: ExternalSessionDescriptor): LegacyImport |
     : null
 }
 
+// Imported sessions keep their provider's runtime kind so the Session surface
+// and provider-runtime duplicate detection can match live bindings back to the
+// same native provider. Kimi and OpenCode are native Cradle runtime kinds;
+// Claude and Codex keep the historical mapping.
+function runtimeKindForSourceApp(sourceApp: ExternalSessionSourceApp): string {
+  switch (sourceApp) {
+    case 'codex':
+      return 'codex'
+    case 'kimi':
+      return 'kimi'
+    case 'opencode':
+      return 'opencode'
+    default:
+      return 'claude-agent'
+  }
+}
+
 function normalizeLegacyExternalId(externalId: string): string {
   return externalId.startsWith('history:') ? externalId.slice('history:'.length) : externalId
 }
@@ -567,7 +590,7 @@ function findProviderSessionDuplicate(descriptor: ExternalSessionDescriptor): {
   sessionId: string
   workspaceId: string | null
 } | null {
-  const runtimeKind = descriptor.sourceApp === 'codex' ? 'codex' : 'claude-agent'
+  const runtimeKind = runtimeKindForSourceApp(descriptor.sourceApp)
   const bindings = listDurableProviderRuntimeBindingsByProviderSession({
     providerSessionId: descriptor.externalSessionId,
     runtimeKind,

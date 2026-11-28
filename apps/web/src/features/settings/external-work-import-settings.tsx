@@ -44,7 +44,7 @@ import { SettingsGroup, SettingsPage } from './settings-container'
 type ImportScan = PostExternalSessionImportScansResponse
 type ImportCandidate = ImportScan['candidates'][number]
 type ImportResultItem = PostExternalSessionImportImportsResponse['items'][number]
-type SourceFilter = 'all' | 'claude' | 'codex'
+type SourceFilter = 'all' | 'claude' | 'codex' | 'kimi' | 'opencode'
 type ImportFilter = 'all' | 'available' | 'update-available' | 'imported'
 
 interface SelectionState {
@@ -410,7 +410,7 @@ export function ExternalWorkImportSettings() {
       >
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border/60 px-3 py-2">
           <div className="flex items-center gap-1">
-            {(['all', 'claude', 'codex'] as const).map(source => (
+            {(['all', 'claude', 'codex', 'kimi', 'opencode'] as const).map(source => (
               <FilterButton key={source} active={sourceFilter === source} onClick={() => setSourceFilter(source)}>
                 {source === 'all' ? t('import.filter.allSources') : source}
               </FilterButton>

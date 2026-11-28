@@ -2454,7 +2454,7 @@ export const patchExternalProviderSourcesBySourceKeyRecordsByExternalRecordIdRun
 };
 
 /**
- * Discover importable external Claude and Codex sessions
+ * Discover importable external Claude, Codex, Kimi, and OpenCode sessions
  */
 export const postExternalSessionImportScansMutation = (options?: Partial<Options<PostExternalSessionImportScansData>>): UseMutationOptions<PostExternalSessionImportScansResponse, DefaultError, Options<PostExternalSessionImportScansData>> => {
     const mutationOptions: UseMutationOptions<PostExternalSessionImportScansResponse, DefaultError, Options<PostExternalSessionImportScansData>> = {

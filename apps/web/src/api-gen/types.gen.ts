@@ -4252,7 +4252,7 @@ export type PatchExternalProviderSourcesBySourceKeyRecordsByExternalRecordIdRunt
 export type PostExternalSessionImportScansData = {
     body: {
         sourceHostId?: string;
-        sourceApps?: Array<'claude' | 'codex'>;
+        sourceApps?: Array<'claude' | 'codex' | 'kimi' | 'opencode'>;
         limitPerSource?: number;
     };
     path?: never;
@@ -4270,7 +4270,7 @@ export type PostExternalSessionImportScansResponses = {
         candidates: Array<{
             candidateId: string;
             sourceHostId: string;
-            sourceApp: 'claude' | 'codex';
+            sourceApp: 'claude' | 'codex' | 'kimi' | 'opencode';
             externalSessionId: string;
             sourceRevision: string;
             title: string;
@@ -4319,7 +4319,7 @@ export type GetExternalSessionImportScansByScanIdResponses = {
         candidates: Array<{
             candidateId: string;
             sourceHostId: string;
-            sourceApp: 'claude' | 'codex';
+            sourceApp: 'claude' | 'codex' | 'kimi' | 'opencode';
             externalSessionId: string;
             sourceRevision: string;
             title: string;
@@ -4363,7 +4363,7 @@ export type GetExternalSessionImportImportsResponses = {
     200: Array<{
         id: string;
         sourceHostId: string;
-        sourceApp: 'claude' | 'codex';
+        sourceApp: 'claude' | 'codex' | 'kimi' | 'opencode';
         externalSessionId: string;
         sourcePath: string | null;
         sourceWorkspacePath: string;

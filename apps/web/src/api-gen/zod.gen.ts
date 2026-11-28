@@ -791,7 +791,12 @@ export const zPatchExternalProviderSourcesBySourceKeyRecordsByExternalRecordIdRu
 
 export const zPostExternalSessionImportScansBody = z.object({
     sourceHostId: z.string().min(1).optional(),
-    sourceApps: z.array(z.enum(['claude', 'codex'])).optional(),
+    sourceApps: z.array(z.enum([
+        'claude',
+        'codex',
+        'kimi',
+        'opencode'
+    ])).optional(),
     limitPerSource: z.number().gte(1).lte(2000).optional()
 });
 

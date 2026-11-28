@@ -8,7 +8,7 @@ const spec = {
     "external-session-import",
     "scan"
   ],
-  "description": "Discover importable external Claude and Codex sessions",
+  "description": "Discover importable external Claude, Codex, Kimi, and OpenCode sessions",
   "flags": [
     {
       "name": "sourceHostId",
