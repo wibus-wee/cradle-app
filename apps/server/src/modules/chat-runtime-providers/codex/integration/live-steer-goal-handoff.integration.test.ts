@@ -297,6 +297,7 @@ function completedResponse(id: string, text: string): JsonObject {
     created_at: 1,
     status: 'completed',
     background: false,
+    access_programs: null,
     error: null,
     incomplete_details: null,
     instructions: null,
