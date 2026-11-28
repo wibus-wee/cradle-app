@@ -1,6 +1,6 @@
 import type { UIMessage } from 'ai'
 
-export type ExternalSessionSourceApp = 'claude' | 'codex'
+export type ExternalSessionSourceApp = 'claude' | 'codex' | 'kimi' | 'opencode'
 
 export interface ExternalSessionGitIdentity {
   originUrl: string | null

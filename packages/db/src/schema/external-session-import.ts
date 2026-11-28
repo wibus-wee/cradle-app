@@ -6,7 +6,7 @@ import { textPk, timestamps, workspaces } from './shared'
 export const externalSessionImports = sqliteTable('external_session_imports', {
   id: textPk(),
   sourceHostId: text('source_host_id').notNull(),
-  sourceApp: text('source_app', { enum: ['claude', 'codex'] }).notNull(),
+  sourceApp: text('source_app', { enum: ['claude', 'codex', 'kimi', 'opencode'] }).notNull(),
   externalSessionId: text('external_session_id').notNull(),
   sourcePath: text('source_path'),
   sourceWorkspacePath: text('source_workspace_path').notNull(),

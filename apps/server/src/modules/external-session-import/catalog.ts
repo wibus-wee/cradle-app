@@ -80,7 +80,7 @@ export async function scanExternalSessions(
   const now = dependencies.now?.() ?? Date.now()
   evictExpiredScans(now)
   const sourceHostId = input.sourceHostId ?? 'local'
-  const requestedApps = new Set(input.sourceApps ?? ['claude', 'codex'])
+  const requestedApps = new Set(input.sourceApps ?? ['claude', 'codex', 'kimi', 'opencode'])
   const adapters = (dependencies.adapters ?? createExternalSessionSources())
     .filter(adapter => requestedApps.has(adapter.sourceApp))
 
@@ -216,6 +216,11 @@ function findImportedCandidate(descriptor: ExternalSessionDescriptor): {
     .get()
   if (current) {
     return current
+  }
+  // Legacy external_work_import_items predate this module and only ever
+  // recorded claude/codex sessions; newer source apps cannot have legacy rows.
+  if (descriptor.sourceApp !== 'claude' && descriptor.sourceApp !== 'codex') {
+    return null
   }
   const legacy = db()
     .select({ externalId: externalWorkImportItems.externalId })

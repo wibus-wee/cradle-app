@@ -10,7 +10,7 @@ export const externalSessionImport = new Elysia({
 })
   .post('/scans', ({ body }) => ExternalSessionCatalog.scanExternalSessions(body ?? {}), {
     detail: {
-      'summary': 'Discover importable external Claude and Codex sessions',
+      'summary': 'Discover importable external Claude, Codex, Kimi, and OpenCode sessions',
       'x-cradle-cli': {
         command: ['external-session-import', 'scan'],
       },

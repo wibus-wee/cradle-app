@@ -1,6 +1,11 @@
 import { t } from 'elysia'
 
-const sourceApp = t.Union([t.Literal('claude'), t.Literal('codex')])
+const sourceApp = t.Union([
+  t.Literal('claude'),
+  t.Literal('codex'),
+  t.Literal('kimi'),
+  t.Literal('opencode'),
+])
 const nullableString = t.Nullable(t.String())
 const nullableNumber = t.Nullable(t.Number())
 const availability = t.Union([

@@ -23,7 +23,9 @@ const BundleManifestSchema = z.object({
   version: z.literal(1),
   parserVersion: z.number().int().positive(),
   sourceHostId: z.string().min(1),
-  sourceApp: z.enum(['claude', 'codex']),
+  // Validated as a bare string: source apps are added by adapter ownership,
+  // and bundle integrity is checked against the descriptor fields below.
+  sourceApp: z.string().min(1),
   externalSessionId: z.string().min(1),
   sourceRevision: z.string().min(1),
   capturedAt: z.number().int().nonnegative(),

@@ -2080,7 +2080,7 @@ export const patchExternalProviderSourcesBySourceKeyRecordsByExternalRecordIdRun
 });
 
 /**
- * Discover importable external Claude and Codex sessions
+ * Discover importable external Claude, Codex, Kimi, and OpenCode sessions
  */
 export const postExternalSessionImportScans = <ThrowOnError extends boolean = false>(options: Options<PostExternalSessionImportScansData, ThrowOnError>): RequestResult<PostExternalSessionImportScansResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostExternalSessionImportScansResponses, unknown, ThrowOnError>({
     requestValidator: async (data) => await z.object({
