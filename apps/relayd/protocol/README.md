@@ -195,3 +195,97 @@ Flow control is cumulative per stream. Each direction starts with 512 KiB of
 credit, acknowledges bytes only after its local consumer applies them, and may
 grow to 8 MiB. Total unacknowledged data across the link is capped at 16 MiB.
 Mutations and streams are never replayed automatically after link failure.
+
+## Fabric agent IPC
+
+A Cradle Server may delegate its envelope carriage to a local fabric-agent
+process instead of dialing relayd WebSockets itself. The agent is a
+byte-transparent pipe: it never inspects payloads beyond the cleartext v3
+header and holds no Fabric key material. This section is the contract between
+the server and the agent; it is independent of how the agent reaches the
+network (in the initial version it bridges to relayd WebSockets).
+
+### Transport and authentication
+
+The agent listens on `127.0.0.1` at an ephemeral TCP port shared by IPC and
+health checks (see below). The port and a random 32-byte authentication token
+are written as JSON to a mode-0600 `agent.json` locator file next to the
+agent's state directory:
+
+```json
+{ "version": 1, "port": 54321, "tokenFile": "ipc-token", "pid": 12345 }
+```
+
+The token itself lives in a separate mode-0600 file. Connecting clients send
+the token as the first IPC frame. The agent never accepts tokens, ports, or
+relay URLs from the process command line. Windows note: named pipes are not
+used because Node.js and Go unix-socket implementations do not interoperate
+there.
+
+### Connection shape
+
+Topology mirrors the relayd WebSocket layout so that lifecycle semantics port
+unchanged:
+
+- Node role: one long-lived IPC connection multiplexing every link, demuxed
+  by envelope `linkId` — exactly like the `/v1/ws/nodes` socket.
+- Controller role: one IPC connection per link — exactly like
+  `/v1/ws/controllers/{linkId}`.
+
+### Framing
+
+After authentication, every frame is:
+
+| Bytes | Field |
+| ---: | --- |
+| 4 | Payload byte length, unsigned big-endian. Maximum `1 << 20` (1 MiB), matching the relay frame cap; larger frames close the connection. |
+| n | One complete Fabric v3 envelope, unmodified. |
+
+Envelopes are self-describing (`fabricId`, `nodeId`, `linkId`, `streamId`,
+`priority`, `kind` in cleartext), so the agent schedules and routes exactly
+like relayd's hub without decrypting: bounded queues with
+backpressure-instead-of-disconnect, control-priority reserved capacity,
+per-stream round-robin dequeuing, and stream-close that must not overtake
+queued data of its own stream.
+
+### Authentication frame
+
+The first frame on each connection is a length-prefixed UTF-8 JSON object,
+not a v3 envelope:
+
+```json
+{
+  "version": 1,
+  "token": "<ipc-token>",
+  "role": "node" | "controller",
+  "relayUrl": "http://relay.example:8787",
+  "fabricId": "...",
+  "nodeId": "...",
+  "linkId": "... (controller role only)",
+  "headers": { "X-Cradle-Fabric-Certificate": "...", "X-Cradle-Fabric-Proof": "..." }
+}
+```
+
+`headers` carries the same certificate/proof pair the server would send on
+the relayd WebSocket upgrade. These are short-lived request proofs, not
+bearer secrets; the agent uses them once to establish the upstream connection
+and does not persist them. A wrong token closes the connection without a
+reply. A `node`-role connection requires `fabricId` and `nodeId`; a
+`controller`-role connection additionally requires `linkId`.
+
+### Failure semantics
+
+The IPC connection is the link: when the agent's upstream connection to
+relayd dies, the agent closes the corresponding IPC connection, and vice
+versa. There is no reconnect, resume, or replay inside the pipe — identical
+failure semantics to the relayd WebSocket it replaces. Setup failures before
+the first byte are surfaced by connection refusal or immediate close and are
+retryable by the client.
+
+### Health and supervision
+
+The agent answers a bare ASCII `GET /healthz` probe on the same loopback port:
+a connection whose first bytes are `GET /healthz` receives a one-line `ok`
+response instead of the token-close behavior. Supervisors (desktop or the
+headless server) restart the agent with backoff; a restarting agent drops
+every link pipe, and clients fall back per their own policy.
