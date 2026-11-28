@@ -64,7 +64,8 @@
         }
       ],
       "./plugins/with-markdown-view",
-      "./plugins/with-ios-scene-lifecycle"
+      "./plugins/with-ios-scene-lifecycle",
+      "expo-font"
     ],
     "experiments": {
       "inlineModules": {
