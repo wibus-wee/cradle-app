@@ -21,7 +21,8 @@ const engineMocks = vi.hoisted(() => ({
   }),
   createLanguageModel: vi.fn(() => ({ provider: 'mock-model' })),
   detectApiFormat: vi.fn(() => 'openai'),
-  getCachedContextWindow: vi.fn(() => 32_000),
+  getCachedContextWindow: vi.fn((): number | null => 32_000),
+  getProviderTargetContextWindow: vi.fn((_targetId: string | null | undefined, _modelId: string) => null as number | null),
 }))
 
 vi.mock('../../chat-runtime-engine/ai-sdk-engine', async (importOriginal) => {
@@ -50,9 +51,18 @@ vi.mock('../../model-registry/model-info-registry', async (importOriginal) => {
   }
 })
 
+vi.mock('../../model-registry/provider-target-context-windows', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../model-registry/provider-target-context-windows')>()
+  return {
+    ...actual,
+    getProviderTargetContextWindow: engineMocks.getProviderTargetContextWindow,
+  }
+})
+
 describe('openai compatible provider', () => {
   afterEach(() => {
     vi.clearAllMocks()
+    engineMocks.getProviderTargetContextWindow.mockReturnValue(null)
     engineMocks.executeAiSdkTurn.mockImplementation(async function* (_input: AiSdkEngineInput) {
       yield { type: 'text-start', id: 'text-1' }
       yield { type: 'text-delta', id: 'text-1', delta: 'Standard answer' }
@@ -92,6 +102,64 @@ describe('openai compatible provider', () => {
       contextWindow: 32_000,
       maxSteps: 1,
       chatSessionId: 'chat-session-1',
+    }))
+  })
+
+  it('compacts against the window the provider target declared for the model', async () => {
+    // A gateway that serves a 1M-token model must not be compacted at 96k just
+    // because models.dev has no record for its pooled model id.
+    engineMocks.getProviderTargetContextWindow.mockReturnValue(1_000_000)
+    const provider = new OpenAICompatibleProvider(createProviderContext())
+
+    for await (const _chunk of provider.streamTurn({
+      runId: 'run-standard',
+      runtimeSession: createRuntimeSession(),
+      profile: createProfile(),
+      message: createUserMessage('Hello standard'),
+      workspaceId: 'workspace-1',
+      workspacePath: '/tmp/workspace',
+    })) {
+      // drain
+    }
+
+    expect(engineMocks.getProviderTargetContextWindow).toHaveBeenCalledWith('profile-standard', 'gpt-test')
+    expect(engineMocks.executeAiSdkTurn).toHaveBeenCalledWith(expect.objectContaining({
+      contextWindow: 1_000_000,
+    }))
+    // The target-scoped declaration wins; the global registry guess is not consulted.
+    expect(engineMocks.getCachedContextWindow).not.toHaveBeenCalled()
+  })
+
+  it('falls back to the registry window, then 128k, when the target declares none', async () => {
+    const provider = new OpenAICompatibleProvider(createProviderContext())
+
+    for await (const _chunk of provider.streamTurn({
+      runId: 'run-standard',
+      runtimeSession: createRuntimeSession(),
+      profile: createProfile(),
+      message: createUserMessage('Hello standard'),
+      workspaceId: 'workspace-1',
+      workspacePath: '/tmp/workspace',
+    })) {
+      // drain
+    }
+    expect(engineMocks.executeAiSdkTurn).toHaveBeenLastCalledWith(expect.objectContaining({
+      contextWindow: 32_000,
+    }))
+
+    engineMocks.getCachedContextWindow.mockReturnValueOnce(null)
+    for await (const _chunk of provider.streamTurn({
+      runId: 'run-standard-2',
+      runtimeSession: createRuntimeSession(),
+      profile: createProfile(),
+      message: createUserMessage('Hello standard'),
+      workspaceId: 'workspace-1',
+      workspacePath: '/tmp/workspace',
+    })) {
+      // drain
+    }
+    expect(engineMocks.executeAiSdkTurn).toHaveBeenLastCalledWith(expect.objectContaining({
+      contextWindow: 128_000,
     }))
   })
 

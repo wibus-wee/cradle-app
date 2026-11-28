@@ -115,10 +115,16 @@ async function bootstrap() {
   await initializeTelemetry()
   installProcessFatalHandlers()
   const bootstrapReporter = new ServerBootstrapReporter()
-  const [{ createServerApp }, { loadServerConfig }, { warmupModelsDevCache }] = await Promise.all([
+  const [
+    { createServerApp },
+    { loadServerConfig },
+    { warmupModelsDevCache },
+    { scheduleProviderTargetContextWindowWarmup },
+  ] = await Promise.all([
     import('./app'),
     import('./config/server-config'),
     import('./modules/model-registry/model-info-registry'),
+    import('./modules/provider-catalog/model-cache'),
   ])
 
   const config = loadServerConfig()
@@ -143,6 +149,8 @@ async function bootstrap() {
         logger.info(`listening on http://${config.host}:${config.port}`)
         // Force-refresh models.dev catalog on boot (SWR soft/hard TTL applies afterward)
         warmupModelsDevCache()
+        // Republish provider-declared context windows off the boot critical path
+        scheduleProviderTargetContextWindowWarmup()
       },
     )
   }

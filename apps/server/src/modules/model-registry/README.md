@@ -39,3 +39,11 @@ reconstructs the optimistic model projection without guessing an upstream provid
 - `model-info-aggregation.ts`: Pure duplicate-record aggregation policy. It reconstructs the most
   complete provider-agnostic projection available for model IDs exposed by unknown gateways without
   combining scalar price fields from different providers.
+- `provider-target-context-windows.ts`: In-memory, target-scoped map of the context windows a provider
+  target declared through its own model inventory. models.dev answers "how large is this model" (global,
+  often missing for gateway-specific ids such as magpie's `codex/gpt-6.2-sol`); the target's inventory
+  answers "how much will this endpoint accept", which is what a run must compact against. Because two
+  targets can serve the same model id with different served windows, resolution is keyed by
+  `providerTargetId` and then model id. `provider-catalog` publishes into the map when it writes a
+  target's inventory and republishes from the persisted cache at boot, so the runner's first-token path
+  only ever does a memory lookup.

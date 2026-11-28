@@ -29,7 +29,11 @@ This module owns **Inventory** (layer 1):
     empty result without fetching.
 - `model-cache.ts` owns only inventory persistence and freshness/failure state:
   - `setCachedModelsForTarget` strips all registry-enrichment-derived fields (registryMatch,
-    registryModelId, cost, family, knowledgeCutoff, releaseDate) before persisting.
+    registryModelId, cost, family, knowledgeCutoff, releaseDate) before persisting, and publishes the
+    surviving declared context windows into Model Registry's target-scoped window map in the same step.
+  - `scheduleProviderTargetContextWindowWarmup` republishes those windows from the persisted inventory
+    after listen, so a restarted server's first turn compacts against what each target declared the last
+    time it was listed instead of the models.dev guess or the 128k default.
   - `readCachedModelInventory` returns the raw persisted inventory; enrichment and capability
     projection live in the query pipeline so mapping changes take effect on read without a
     cache invalidation.

@@ -20,6 +20,7 @@ import type { TokenUsage } from '../../chat-runtime-engine/ai-sdk-engine'
 import { buildModelMessages, executeAiSdkTurn } from '../../chat-runtime-engine/ai-sdk-engine'
 import { createLanguageModel, detectApiFormat } from '../../chat-runtime-engine/providers'
 import { getCachedContextWindow } from '../../model-registry/model-info-registry'
+import { getProviderTargetContextWindow } from '../../model-registry/provider-target-context-windows'
 import { readTrustedOpenAICompatibleConfig, readTrustedUniversalConfig } from '../../provider-contracts/provider-base'
 import { readProviderStateSnapshot } from '../kit/state-snapshot'
 import {
@@ -118,9 +119,15 @@ export class OpenAICompatibleProvider implements ChatRuntime {
         maxMessages,
       )
 
-      // Catalog metadata is optional. Never put network or SQLite catalog I/O
-      // on the first-token path; startup warmup populates this in-memory cache.
-      const contextWindow = getCachedContextWindow(effectiveModel) ?? 128_000
+      // Catalog metadata is optional. Never put network or SQLite catalog I/O on
+      // the first-token path; startup warmup populates both in-memory caches.
+      // Precedence: the window this target declared for this model (what the
+      // endpoint accepts) → the models.dev guess for the id → conservative 128k.
+      // Compacting against the registry alone made a 1M-window gateway model
+      // compact at 96k whenever models.dev did not know its pooled id.
+      const contextWindow = getProviderTargetContextWindow(profile.providerTargetId, effectiveModel)
+        ?? getCachedContextWindow(effectiveModel)
+        ?? 128_000
 
       yield* executeAiSdkTurn({
         model,
