@@ -548,6 +548,19 @@ function requestDesktopExit(input: {
     })
     .finally(() => {
       clearTimeout(forceExitTimer)
+      // Sparkle installs staged updates only when the app terminates on its own
+      // (a natural quit) — process teardown through app.exit() would drop the
+      // pending installation. When an update is downloaded, stage it and quit
+      // naturally; the before-quit handler above lets the quit through because
+      // shutdownPromise is already settled. Sparkle relaunches the new version.
+      const manager = updateManager
+      if (manager?.status.updateDownloaded && manager.status.provider === 'sparkle') {
+        manager.installSparkleUpdateOnQuit()
+        if (input.exitCode === 0) {
+          app.quit()
+          return
+        }
+      }
       app.exit(input.exitCode)
     })
 }
@@ -800,7 +813,10 @@ export async function startDesktopApp(): Promise<void> {
       setMainWindow(mainWindow)
       setupApplicationMenu({
         checkForUpdates: () => {
+          // The silent Sparkle driver shows nothing on its own: surface the
+          // settings surface so the user sees check progress and results.
           void updateManager?.checkForUpdates()
+          void trayManager?.performAction('open-desktop-settings')
         },
         openSettings: () => {
           void trayManager?.performAction('open-desktop-settings')
@@ -952,6 +968,15 @@ export async function startDesktopApp(): Promise<void> {
   })
 
   app.on('before-quit', (event) => {
+    if (shutdownPromise) {
+      // Cleanup is done or already running. Let the quit proceed instead of
+      // re-entering shutdown: this is the natural-quit continuation after
+      // requestDesktopExit's cleanup finished, and — critically — Sparkle's
+      // installUpdateNow() termination. Canceling it here would silently abort
+      // the update install, and exiting through app.exit() would prevent
+      // Sparkle's relaunch-on-quit machinery.
+      return
+    }
     event.preventDefault()
     requestDesktopExit({
       reason: 'app quit',

@@ -17,6 +17,7 @@ const EMPTY_UPDATE_STATUS: DesktopUpdateStatus = {
   isPreparingUpdate: false,
   updateDownloaded: false,
   updateInfo: null,
+  downloadProgress: null,
   errorMessage: null,
 }
 
@@ -60,16 +61,20 @@ export function SidebarUpdateButton({ collapsed }: { collapsed: boolean }) {
     })
   }, [status.updateInfo?.version, t])
 
+  // macOS Sparkle downloads never enter Download Center; their progress lives
+  // on status.downloadProgress. Only Windows/Linux electron-updater downloads
+  // surface as tasks here.
   const updateDownload = downloadTasks.find(task => task.scope === 'desktop'
     && task.owner.namespace === 'desktop-update'
     && (
-      task.owner.resourceType === 'macos-update'
-      || task.owner.resourceType === 'windows-update'
+      task.owner.resourceType === 'windows-update'
       || task.owner.resourceType === 'linux-update'
     )
     && isActiveDownload(task))
+  const sparkleDownloadPercent = status.downloadProgress?.percent ?? null
   const hasUpdateNotice = !!status.updateInfo
     || !!updateDownload
+    || !!status.downloadProgress
     || status.isPreparingUpdate
     || status.updateDownloaded
 
@@ -81,13 +86,17 @@ export function SidebarUpdateButton({ collapsed }: { collapsed: boolean }) {
     ? t('update.status.unavailable')
     : status.isCheckingForUpdates
       ? t('update.status.checking')
-      : updateDownload
+      : updateDownload || status.downloadProgress?.phase === 'download'
         ? t('update.status.downloading', {
-            progress: updateDownload.totalBytes && updateDownload.totalBytes > 0
-              ? Math.round((updateDownload.transferredBytes / updateDownload.totalBytes) * 100)
-              : '—',
+            progress: updateDownload
+              ? (updateDownload.totalBytes && updateDownload.totalBytes > 0
+                ? Math.round((updateDownload.transferredBytes / updateDownload.totalBytes) * 100)
+                : '—')
+              : sparkleDownloadPercent === null
+                ? '—'
+                : Math.round(sparkleDownloadPercent),
           })
-        : status.isPreparingUpdate
+        : status.isPreparingUpdate || status.downloadProgress?.phase === 'apply'
           ? t('update.status.preparing')
           : status.updateDownloaded
             ? t('update.status.downloaded')
@@ -105,7 +114,7 @@ export function SidebarUpdateButton({ collapsed }: { collapsed: boolean }) {
       availableLabel={status.updateInfo
         ? t('update.tooltip.available', { version: status.updateInfo.version })
         : null}
-      isDownloading={!!updateDownload}
+      isDownloading={!!updateDownload || status.downloadProgress?.phase === 'download'}
       onOpen={() => openSettingsSection('desktop')}
     />
   )

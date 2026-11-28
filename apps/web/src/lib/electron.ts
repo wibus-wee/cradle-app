@@ -427,6 +427,14 @@ export interface DesktopUpdateInfo {
 
 export type DesktopUpdateProvider = 'sparkle' | 'electron-updater' | null
 
+export interface DesktopUpdateDownloadProgress {
+  phase: 'download' | 'apply'
+  percent: number | null
+  transferred: number | null
+  total: number | null
+  fallback: boolean
+}
+
 export interface DesktopUpdateStatus {
   unsupported: boolean
   provider: DesktopUpdateProvider
@@ -435,6 +443,7 @@ export interface DesktopUpdateStatus {
   isPreparingUpdate: boolean
   updateDownloaded: boolean
   updateInfo: DesktopUpdateInfo | null
+  downloadProgress: DesktopUpdateDownloadProgress | null
   errorMessage: string | null
 }
 

@@ -21,6 +21,7 @@ const EMPTY_UPDATE_STATUS: DesktopUpdateStatus = {
   isPreparingUpdate: false,
   updateDownloaded: false,
   updateInfo: null,
+  downloadProgress: null,
   errorMessage: 'Desktop updates are only available in the Electron app',
 }
 
@@ -47,19 +48,21 @@ export function DesktopUpdateSettings() {
     savePrefs: saveDesktopPreferences,
   } = useDesktopPreferences()
 
+  // Sparkle downloads live outside Download Center by design; their progress
+  // arrives on status.downloadProgress instead. Only Windows/Linux electron-updater
+  // downloads surface as Download Center tasks here.
   const updateDownload = downloadTasks.find(task => task.scope === 'desktop'
     && task.owner.namespace === 'desktop-update'
     && (
-      task.owner.resourceType === 'macos-update'
-      || task.owner.resourceType === 'windows-update'
+      task.owner.resourceType === 'windows-update'
       || task.owner.resourceType === 'linux-update'
     )
     && isActiveDownload(task)) ?? null
   const busy = loading
     || status.isCheckingForUpdates
     || !!updateDownload
+    || !!status.downloadProgress
     || status.isPreparingUpdate
-  const isSparkle = status.provider === 'sparkle'
   const canCheck = isElectron && !!nativeIpc && !status.unsupported && !busy
 
   const updateStatusLabel = useMemo(() => {
@@ -69,10 +72,10 @@ export function DesktopUpdateSettings() {
     if (status.isCheckingForUpdates) {
       return t('desktop.updates.status.checking' as SettingsKey)
     }
-    if (updateDownload) {
+    if (updateDownload || status.downloadProgress?.phase === 'download') {
       return t('desktop.updates.status.downloading' as SettingsKey)
     }
-    if (status.isPreparingUpdate) {
+    if (status.isPreparingUpdate || status.downloadProgress?.phase === 'apply') {
       return t('desktop.updates.status.preparing' as SettingsKey)
     }
     if (status.updateDownloaded) {
@@ -172,8 +175,8 @@ export function DesktopUpdateSettings() {
       capabilities={{
         refreshUpdate: !!nativeIpc && !busy,
         checkUpdate: canCheck,
-        downloadUpdate: canCheck && !isSparkle && !!status.updateInfo && !status.updateDownloaded,
-        applyUpdate: canCheck && !isSparkle && status.updateDownloaded,
+        downloadUpdate: canCheck && !!status.updateInfo && !status.updateDownloaded,
+        applyUpdate: canCheck && status.updateDownloaded,
         refreshCli: !!nativeIpc && !loading,
         removeCli: !!nativeIpc && !loading && cliStatus.supported && cliStatus.installed,
         installCli: !!nativeIpc && !loading && cliStatus.supported,
@@ -193,6 +196,7 @@ export function DesktopUpdateSettings() {
         updateStatus: updateStatusLabel,
         currentVersion: t('desktop.updates.currentVersion' as SettingsKey),
         downloading: t('desktop.updates.status.downloading' as SettingsKey),
+        preparing: t('desktop.updates.status.preparing' as SettingsKey),
         availableVersion: t('desktop.updates.availableVersion' as SettingsKey),
         noUpdate: t('desktop.updates.none' as SettingsKey),
         releaseNotes: t('desktop.updates.releaseNotes' as SettingsKey),

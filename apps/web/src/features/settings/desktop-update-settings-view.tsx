@@ -57,6 +57,7 @@ interface DesktopUpdateSettingsViewProps {
     updateStatus: string
     currentVersion: string
     downloading: string
+    preparing: string
     availableVersion: string
     noUpdate: string
     releaseNotes: string
@@ -115,7 +116,7 @@ export function DesktopUpdateSettingsView({
 
   const targetVersion = status.updateInfo?.version ?? null
   const targetSize = status.updateInfo?.files.reduce((sum, file) => sum + (file.size ?? 0), 0) ?? 0
-  const isSparkle = status.provider === 'sparkle'
+  const sparkleProgress = status.downloadProgress
 
   return (
     <SettingsPage
@@ -199,6 +200,22 @@ export function DesktopUpdateSettingsView({
                     </span>
                   </div>
                 )}
+                {sparkleProgress && (
+                  <div className="flex items-center justify-between gap-3 text-[12px]">
+                    <span className="text-muted-foreground">
+                      {sparkleProgress.phase === 'apply' ? labels.preparing : labels.downloading}
+                    </span>
+                    <span className="font-mono tabular-nums text-foreground">
+                      {sparkleProgress.phase === 'download' && sparkleProgress.transferred !== null
+                        ? formatCompactBytes(sparkleProgress.transferred)
+                        : ''}
+                      {sparkleProgress.phase === 'download' && sparkleProgress.transferred !== null && sparkleProgress.total !== null
+                        ? ` / ${formatCompactBytes(sparkleProgress.total)}`
+                        : ''}
+                      {sparkleProgress.percent !== null ? `${sparkleProgress.transferred !== null ? ' · ' : ''}${Math.round(sparkleProgress.percent)}%` : ''}
+                    </span>
+                  </div>
+                )}
                 <div className="flex items-center justify-between gap-3 text-[12px]">
                   <span className="text-muted-foreground">{labels.availableVersion}</span>
                   <div className="flex items-center gap-2">
@@ -248,30 +265,26 @@ export function DesktopUpdateSettingsView({
                       : <PackageCheckIcon className="size-3.5" aria-hidden="true" />}
                     {labels.checkUpdate}
                   </Button>
-                  {!isSparkle && (
-                    <>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={onDownloadUpdate}
-                        disabled={!capabilities.downloadUpdate}
-                      >
-                        <DownloadIcon className="size-3.5" aria-hidden="true" />
-                        {labels.downloadUpdate}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="default"
-                        size="sm"
-                        onClick={onApplyUpdate}
-                        disabled={!capabilities.applyUpdate}
-                      >
-                        <RefreshCwIcon className="size-3.5" aria-hidden="true" />
-                        {labels.restart}
-                      </Button>
-                    </>
-                  )}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={onDownloadUpdate}
+                    disabled={!capabilities.downloadUpdate}
+                  >
+                    <DownloadIcon className="size-3.5" aria-hidden="true" />
+                    {labels.downloadUpdate}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="default"
+                    size="sm"
+                    onClick={onApplyUpdate}
+                    disabled={!capabilities.applyUpdate}
+                  >
+                    <RefreshCwIcon className="size-3.5" aria-hidden="true" />
+                    {labels.restart}
+                  </Button>
                 </div>
               </DesktopOperationsCard>
 
