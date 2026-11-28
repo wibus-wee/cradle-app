@@ -396,6 +396,9 @@ export function isUIMessageStreamSnapshotChunk(
  * message when no step has started) and discard in-flight stream state.
  */
 function rollbackCurrentStep(message: UIMessage, state: UIMessageStreamState): void {
+  // Mirror upstream processUIMessageStream: the step boundary itself is
+  // discarded as well — a restarted step re-emits 'start-step'. Without any
+  // step boundary the whole message content belongs to the current step.
   let boundary = -1
   for (let index = message.parts.length - 1; index >= 0; index--) {
     if (message.parts[index]!.type === 'step-start') {
@@ -403,7 +406,7 @@ function rollbackCurrentStep(message: UIMessage, state: UIMessageStreamState): v
       break
     }
   }
-  message.parts.splice(boundary + 1)
+  message.parts.splice(boundary === -1 ? 0 : boundary)
   state.activeTextParts.clear()
   state.activeReasoningParts.clear()
   state.partialToolCalls.clear()
