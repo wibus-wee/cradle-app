@@ -18,7 +18,12 @@ import {
   OpenAICompatibleConfigJsonSchema,
   UniversalProviderConfigJsonSchema,
 } from '../provider-contracts/provider-base'
-import type { ModelDescriptor, ProviderKind, ProviderRequest } from '../provider-contracts/types'
+import type {
+  ModelCapabilities,
+  ModelDescriptor,
+  ProviderKind,
+  ProviderRequest,
+} from '../provider-contracts/types'
 import { readProviderDefaultModelCapabilities } from './model-capabilities'
 import { resolveAnthropicWireAuth } from './provider-endpoint-registry'
 
@@ -41,15 +46,48 @@ const ANTHROPIC_VERSION = '2023-06-01'
 const PRIVATE_PROVIDER_HOSTS_ENV = 'CRADLE_ALLOW_PRIVATE_PROVIDER_HOSTS'
 const DESKTOP_PROCESS_ENV = 'CRADLE_DESKTOP_PID'
 const DESKTOP_LOCAL_PROVIDER_HOSTS = ['127.0.0.1', 'localhost', '::1'] as const
-const OpenAICompatibleModelsResponseSchema = z.object({
-  data: z
-    .array(
-      z.object({
-        id: z.string(),
-      }),
-    )
-    .min(1),
+/**
+ * OpenAI's own `/v1/models` only defines `id`, but gateways that also act as a
+ * model catalog (magpie, LiteLLM, vLLM, OpenRouter) return served-model facts
+ * next to it. Those facts are inventory, not enrichment: they describe what the
+ * endpoint in front of Cradle accepts. Reading them keeps a model usable when
+ * models.dev has no record for a gateway-specific id.
+ */
+const OpenAICompatibleModelSchema = z.object({
+  id: z.string(),
+  display_name: z.string().optional(),
+  context_window: z.number().positive().optional(),
+  context_length: z.number().positive().optional(),
+  max_input_tokens: z.number().positive().optional(),
+  max_output_tokens: z.number().positive().optional(),
+  modalities: z.object({
+    input: z.array(z.string()).optional(),
+    output: z.array(z.string()).optional(),
+  }).optional(),
+  reasoning: z.boolean().optional(),
+  reasoning_levels: z.array(z.string()).optional(),
+  supported_reasoning_levels: z.array(z.object({ effort: z.string().optional() })).optional(),
+  tool_call: z.boolean().optional(),
 })
+
+const OpenAICompatibleModelsResponseSchema = z.object({
+  data: z.array(OpenAICompatibleModelSchema).min(1),
+})
+
+const OPENAI_COMPATIBLE_REASONING_EFFORTS = [
+  'none',
+  'minimal',
+  'low',
+  'medium',
+  'high',
+  'xhigh',
+  'max',
+  'ultra',
+] as const
+
+type OpenAICompatibleReasoningEffort = (typeof OPENAI_COMPATIBLE_REASONING_EFFORTS)[number]
+
+type OpenAICompatibleModel = z.infer<typeof OpenAICompatibleModelSchema>
 
 const AnthropicModelsResponseSchema = z.object({
   data: z
@@ -136,9 +174,9 @@ class OpenAICompatibleMetadataProvider implements ProviderMetadataProvider {
 
       return payload.data.map(item => ({
         id: item.id,
-        label: item.id,
+        label: item.display_name?.trim() || item.id,
         providerKind: 'openai-compatible' as const,
-        capabilities: {},
+        capabilities: readOpenAiCompatibleModelCapabilities(item),
       }))
     }
     catch (error) {
@@ -246,15 +284,96 @@ class UniversalMetadataProvider implements ProviderMetadataProvider {
       )
       return payload.data.map(item => ({
         id: item.id,
-        label: item.id,
+        label: item.display_name?.trim() || item.id,
         providerKind: 'universal' as const,
-        capabilities: {},
+        capabilities: readOpenAiCompatibleModelCapabilities(item),
       }))
     }
     catch (error) {
       throw wrapProviderModelsError(this.providerKind, error)
     }
   }
+}
+
+/**
+ * Project the served-model facts an OpenAI-compatible endpoint declares into the
+ * capabilities Cradle already renders (context meter, image input, reasoning
+ * selector, tool calling). Registry enrichment still runs afterwards and wins
+ * wherever models.dev knows the model, so this only fills what the upstream
+ * actually declares.
+ *
+ * Prices are deliberately not projected: cost is registry-owned, and inventory
+ * strips it before caching, so a provider-declared price would disappear on the
+ * first cache round-trip and leave the same model priced or unpriced depending
+ * on when it was read.
+ */
+function readOpenAiCompatibleModelCapabilities(
+  model: OpenAICompatibleModel,
+): ModelCapabilities {
+  const capabilities: ModelCapabilities = {}
+  // The served window (`context_window`/`context_length`) is what the gateway
+  // accepts per request. A larger `max_context_window` ceiling is intentionally
+  // not projected: the context meter would promise room the gateway rejects.
+  const contextWindow = model.context_window ?? model.context_length ?? model.max_input_tokens
+  if (contextWindow !== undefined) {
+    capabilities.contextWindow = Math.trunc(contextWindow)
+  }
+  if (model.max_output_tokens !== undefined) {
+    capabilities.maxOutput = Math.trunc(model.max_output_tokens)
+  }
+  const inputModalities = readDeclaredModalities(model.modalities?.input)
+  if (inputModalities) {
+    capabilities.inputModalities = inputModalities
+  }
+  const outputModalities = readDeclaredModalities(model.modalities?.output)
+  if (outputModalities) {
+    capabilities.outputModalities = outputModalities
+  }
+  if (model.reasoning !== undefined) {
+    capabilities.reasoning = model.reasoning
+  }
+  const reasoningEfforts = readDeclaredReasoningEfforts(model)
+  if (reasoningEfforts.length > 0) {
+    capabilities.reasoningEfforts = reasoningEfforts
+  }
+  if (model.tool_call !== undefined) {
+    capabilities.toolCall = model.tool_call
+  }
+  return capabilities
+}
+
+function readDeclaredModalities(values: string[] | undefined): string[] | undefined {
+  const modalities = values?.map(value => value.trim().toLowerCase()).filter(Boolean)
+  return modalities?.length ? [...new Set(modalities)] : undefined
+}
+
+function readDeclaredReasoningEfforts(
+  model: OpenAICompatibleModel,
+): OpenAICompatibleReasoningEffort[] {
+  if (model.reasoning === false) {
+    return []
+  }
+  // `supported_reasoning_levels` is the newer shape; `reasoning_levels` is the
+  // flat equivalent some gateways still return.
+  const declared = model.supported_reasoning_levels?.map(level => level.effort)
+    ?? model.reasoning_levels
+    ?? []
+  const efforts: OpenAICompatibleReasoningEffort[] = []
+  for (const value of declared) {
+    const effort = value?.trim().toLowerCase()
+    if (!isOpenAiCompatibleReasoningEffort(effort) || efforts.includes(effort)) {
+      continue
+    }
+    efforts.push(effort)
+  }
+  return efforts
+}
+
+function isOpenAiCompatibleReasoningEffort(
+  value: string | undefined,
+): value is OpenAICompatibleReasoningEffort {
+  return value !== undefined
+    && (OPENAI_COMPATIBLE_REASONING_EFFORTS as readonly string[]).includes(value)
 }
 
 function invalidProviderRequest(message: string): AppError {

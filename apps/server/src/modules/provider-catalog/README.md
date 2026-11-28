@@ -2,7 +2,7 @@
 
 Provider live catalog HTTP API 与模型列表缓存。
 
-本模块拥有 `/providers` route surface、provider-specific model listing、catalog cache、catalog audit writes，以及 provider list 结果的 capability defaults projection。OpenAI-compatible provider 的 live model discovery 走 provider base URL 下的 OpenAI-compatible `/v1/models` endpoint；本模块不再从 OpenAI-compatible model id 推断 reasoning effort，只保留协议或 registry 显式声明的 `reasoningEfforts`。Universal provider 的 live model discovery 固定走 OpenAI-compatible endpoint，并保留 `universal` descriptor ownership；Anthropic endpoint 只用于 Anthropic provider 自己的 model listing。Registry enrichment 仍由 `model-registry` 拥有，本模块只读取其 mapping/enrichment API。
+本模块拥有 `/providers` route surface、provider-specific model listing、catalog cache、catalog audit writes，以及 provider list 结果的 capability defaults projection。OpenAI-compatible provider 的 live model discovery 走 provider base URL 下的 OpenAI-compatible `/v1/models` endpoint。OpenAI 自己只定义 `id`，但兼作 model catalog 的 gateway（magpie、LiteLLM、vLLM、OpenRouter）会在旁边返回 served-model 事实，因此 inventory 会读取其中已声明的 `display_name`、context window、`modalities`、`reasoning`/reasoning levels、`tool_call` 并投影进 capabilities；registry 仍在其后运行并在知道该模型时覆盖。价格不从 upstream 读取：`cost` 由 registry 拥有，inventory 入库前会剥离它，声明价格会在第一次 cache 往返后消失。本模块不从 OpenAI-compatible model id 推断 reasoning effort，只保留协议、provider 或 registry 显式声明的 `reasoningEfforts`。Universal provider 的 live model discovery 固定走 OpenAI-compatible endpoint，并保留 `universal` descriptor ownership；Anthropic endpoint 只用于 Anthropic provider 自己的 model listing。Registry enrichment 仍由 `model-registry` 拥有，本模块只读取其 mapping/enrichment API。
 
 ## Four-layer contract (Plan 035 M1)
 

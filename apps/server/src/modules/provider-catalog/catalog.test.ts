@@ -84,6 +84,120 @@ describe('providerCatalog', () => {
     expect(fetchSpy).toHaveBeenCalledTimes(1)
   })
 
+  it('projects model facts declared by an OpenAI-compatible gateway', async () => {
+    setSsrAddressLookupForTests(async () => ['93.184.216.34'])
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
+      new Response(JSON.stringify({
+        object: 'list',
+        data: [
+          {
+            id: 'codex/gpt-6.2-sol',
+            display_name: 'GPT-6.2-Sol',
+            context_window: 500_000,
+            max_context_window: 872_000,
+            max_output_tokens: 128_000,
+            modalities: { input: ['text', 'image'], output: ['text'] },
+            reasoning: true,
+            supported_reasoning_levels: [
+              { effort: 'low' },
+              { effort: 'high' },
+              { effort: 'extreme' },
+              { effort: 'high' },
+            ],
+            tool_call: true,
+            // Catalog-only fields Cradle does not model must not fail the parse.
+            pricing: { prompt: '0.000002', completion: '0.00001' },
+            native_endpoints: ['/v1/responses'],
+            service_tiers: [{ id: 'priority', name: 'Fast' }],
+          },
+          {
+            id: 'bare/model',
+            reasoning: false,
+            reasoning_levels: ['high'],
+          },
+        ],
+      }), { status: 200, headers: { 'content-type': 'application/json' } }))
+
+    const provider = new ProviderCatalog().get('openai-compatible')
+    if (!provider) {
+      throw new Error('OpenAI-compatible provider is not registered')
+    }
+
+    await expect(provider.listModels({
+      providerKind: 'openai-compatible',
+      label: 'Magpie',
+      configJson: JSON.stringify({ baseUrl: 'https://gateway.example.test/v1' }),
+      secretRef: null,
+      profileId: null,
+      providerTargetKind: 'manual',
+      providerTargetId: 'magpie',
+      sourceApp: null,
+    }, { readSecret: () => '' })).resolves.toEqual([
+      {
+        id: 'codex/gpt-6.2-sol',
+        label: 'GPT-6.2-Sol',
+        providerKind: 'openai-compatible',
+        capabilities: {
+          // The served window wins over the larger `max_context_window` ceiling.
+          contextWindow: 500_000,
+          maxOutput: 128_000,
+          inputModalities: ['text', 'image'],
+          outputModalities: ['text'],
+          reasoning: true,
+          // Declared values survive in order, unknown efforts are dropped.
+          reasoningEfforts: ['low', 'high'],
+          toolCall: true,
+        },
+      },
+      {
+        id: 'bare/model',
+        label: 'bare/model',
+        providerKind: 'openai-compatible',
+        // A gateway that declares nothing keeps the bare inventory shape.
+        capabilities: { reasoning: false },
+      },
+    ])
+  })
+
+  it('projects declared model facts for universal providers on the OpenAI endpoint', async () => {
+    setSsrAddressLookupForTests(async () => ['93.184.216.34'])
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
+      new Response(JSON.stringify({
+        data: [{
+          id: 'gateway/model',
+          display_name: 'Gateway Model',
+          context_length: 262_144,
+          modalities: { input: ['text'] },
+        }],
+      }), { status: 200, headers: { 'content-type': 'application/json' } }))
+
+    const provider = new ProviderCatalog().get('universal')
+    if (!provider) {
+      throw new Error('Universal provider is not registered')
+    }
+
+    await expect(provider.listModels({
+      providerKind: 'universal',
+      label: 'Gateway',
+      configJson: JSON.stringify({ openaiBaseUrl: 'https://gateway.example.test/v1' }),
+      secretRef: null,
+      profileId: null,
+      providerTargetKind: 'manual',
+      providerTargetId: 'gateway',
+      sourceApp: null,
+    }, { readSecret: () => '' })).resolves.toEqual([
+      {
+        id: 'gateway/model',
+        label: 'Gateway Model',
+        providerKind: 'universal',
+        capabilities: {
+          contextWindow: 262_144,
+          inputModalities: ['text'],
+        },
+      },
+    ])
+  })
+
   it('lists ChatGPT-auth models from Codex model/list when baseUrl is empty', async () => {
     const accessToken = createUnexpiredJwt()
     const fetchSpy = vi.spyOn(globalThis, 'fetch')
