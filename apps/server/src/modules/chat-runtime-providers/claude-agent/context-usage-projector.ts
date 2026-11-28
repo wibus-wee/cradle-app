@@ -19,7 +19,7 @@ export function projectClaudeAgentContextUsage(input: {
   const sections = new Map<string, RuntimeContextUsageSection>()
 
   for (const category of input.response.categories ?? []) {
-    const kind = readContextUsageKind(category.name)
+    const kind = readContextUsageKind(category.name, category.id)
     upsertContextUsageSection(sections, {
       kind,
       label: category.name,
@@ -393,7 +393,29 @@ function upsertContextUsageSection(
   return existing
 }
 
-function readContextUsageKind(name: string): string {
+const CONTEXT_USAGE_ID_KIND_MAP: Record<string, string> = {
+  system_prompt: 'system-prompt',
+  system_tools: 'system-tools',
+  mcp_tools: 'mcp-tools',
+  mcp_instructions: 'mcp-tools',
+  mcp_tools_deferred: 'mcp-tools',
+  system_tools_deferred: 'system-tools',
+  custom_agents: 'agents',
+  memory_files: 'memory-files',
+  skills: 'skills',
+  messages: 'messages',
+  autocompact_buffer: 'buffer',
+  compact_buffer: 'buffer',
+  free_space: 'free-space',
+}
+
+function readContextUsageKind(name: string, id?: string): string {
+  // The SDK documents `id` as the stable row identifier — match on it first
+  // and fall back to the localized English name only when it is absent or
+  // carries an unknown future value.
+  if (id && CONTEXT_USAGE_ID_KIND_MAP[id]) {
+    return CONTEXT_USAGE_ID_KIND_MAP[id]
+  }
   const normalized = name.toLowerCase().replace(/[_-]+/g, ' ')
   if (normalized.includes('system') && normalized.includes('prompt')) {
     return 'system-prompt'

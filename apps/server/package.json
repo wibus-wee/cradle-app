@@ -47,7 +47,7 @@
     "@ai-sdk/anthropic": "^4.0.111",
     "@ai-sdk/google": "^4.0.128",
     "@ai-sdk/openai": "^4.0.125",
-    "@anthropic-ai/claude-agent-sdk": "0.3.261",
+    "@anthropic-ai/claude-agent-sdk": "0.3.332",
     "@arcships/light-ocr": "0.5.7",
     "@babel/parser": "^8.0.4",
     "@cradle/chat-runtime-contracts": "workspace:*",

@@ -15,9 +15,9 @@ export function createContextUsageResponse(
 ): SDKControlGetContextUsageResponse {
   return {
     categories: [
-      { name: 'System prompt', tokens: 100, color: '#2563eb' },
-      { name: 'Messages', tokens: 250, color: '#16a34a' },
-      { name: 'Unclassified provider payload', tokens: 17, color: '#71717a' },
+      { id: 'system_prompt', name: 'System prompt', tokens: 100, color: '#2563eb', kind: 'used' },
+      { id: 'messages', name: 'Messages', tokens: 250, color: '#16a34a', kind: 'used' },
+      { name: 'Unclassified provider payload', tokens: 17, color: '#71717a', kind: 'used' },
     ],
     totalTokens: 367,
     maxTokens: 200_000,
