@@ -60,6 +60,10 @@ export async function resolveOpencodeConfig(input: ResolveOpencodeConfigInput): 
         ...(projection.apiKey ? { apiKey: projection.apiKey } : {}),
         ...(projection.authToken ? { authToken: projection.authToken } : {}),
         timeout: false,
+        // SSE chunk-level timeout defaults to 5 minutes of silence; Cradle
+        // sessions run long-lived tool executions, so disable it together
+        // with the overall request timeout.
+        chunkTimeout: false,
       },
       models: projection.models,
     },
