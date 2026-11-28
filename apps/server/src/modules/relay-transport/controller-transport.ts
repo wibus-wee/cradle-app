@@ -5,10 +5,10 @@ import type { LocalTunnelHandle } from '../../runtime/local-tunnel'
 import { allocateLocalPort } from '../../runtime/local-tunnel'
 import { fabricHeadersRecord } from '../fabric/protocol'
 import type { EnvelopePipe } from './envelope-pipe'
+import { connectEnvelopePipe } from './fabric-agent'
 import type { FabricEnvelopeRoute } from './fabric-envelope'
 import { decodeFabricEnvelope, encodeFabricEnvelope, toFabricSessionEnvelope } from './fabric-envelope'
 import { FabricSession } from './session'
-import { WebSocketEnvelopePipe } from './websocket-envelope-pipe'
 
 /**
  * Controller-side Fabric link transport.
@@ -150,7 +150,6 @@ class ControllerTransport {
 
   private connectAndHandshake(remainingMs: number): Promise<void> {
     const checkpoint = this.startConnectionAttempt()
-    const wsUrl = toWebSocketUrl(this.options.relayUrl, `/v1/ws/controllers/${encodeURIComponent(this.options.fabric.linkId)}`)
     return new Promise<void>((resolve, reject) => {
       let settled = false
       const timeout = setTimeout(
@@ -183,7 +182,14 @@ class ControllerTransport {
       let pipe: EnvelopePipe
       let session: FabricSession
       try {
-        pipe = new WebSocketEnvelopePipe(wsUrl, fabricHeadersRecord(this.options.fabric.headers), {
+        pipe = connectEnvelopePipe({
+          role: 'controller',
+          relayUrl: this.options.relayUrl,
+          fabricId: this.options.fabric.fabricId,
+          nodeId: this.options.fabric.nodeId,
+          linkId: this.options.fabric.linkId,
+          headers: fabricHeadersRecord(this.options.fabric.headers),
+        }, {
           onOpen: () => {
             checkpoint.websocketOpenedAt = Date.now()
             session.start()
@@ -464,17 +470,6 @@ class ControllerTransport {
       },
     }
   }
-}
-
-function toWebSocketUrl(relayUrl: string, path: string): string {
-  const url = new URL(path, `${relayUrl.replace(/\/+$/, '')}/`)
-  if (url.protocol === 'http:') {
-    url.protocol = 'ws:'
-  }
- else if (url.protocol === 'https:') {
-    url.protocol = 'wss:'
-  }
-  return url.toString()
 }
 
 function sleep(ms: number): Promise<void> {

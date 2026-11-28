@@ -56,6 +56,16 @@ Fabric membership rows, certificates, and directory access remain owned by
   auth frame first, then 4-byte big-endian length framing capped at 1 MiB.
   Inbound frames are zero-copy views whenever one TCP chunk already holds a
   complete frame; only fragmentation forces a single copy per frame.
+- `fabric-agent.ts`: fabric agent discovery and carriage mode selection.
+  `CRADLE_FABRIC_AGENT_LOCATOR` points at the agent's `agent.json` locator;
+  the auth token is read fresh from the token file the locator records, never
+  from a command line. `CRADLE_FABRIC_AGENT_DISABLED=1` forces direct
+  WebSockets. Resolution re-reads both files per connection attempt: a
+  connect-time IPC failure falls back to a direct relayd WebSocket (degraded,
+  logged), while a death after the pipe opened is link death exactly like a
+  WebSocket close — no fallback, no replay. New attempts therefore use direct
+  WebSockets while the agent is down and return to IPC once it is back;
+  established pipes never migrate.
 - `controller-transport.ts`: controller-side envelope pipe connection and local
   TCP listener for one Fabric link. It returns the shared `LocalTunnelHandle`
   contract owned by `src/runtime/local-tunnel.ts`.

@@ -9,9 +9,9 @@ import { assertFabricCertificate, fabricAuthHeaders, fabricHeadersRecord } from 
 import { completeNodeEnrollment, getFabricMembership, hasPendingNodeEnrollment, registerLocalFabricController, requireFabricMembershipSecretRefs } from '../fabric/service'
 import { readSecret, upsertSecret } from '../secrets/service'
 import type { EnvelopePipe } from './envelope-pipe'
+import { connectEnvelopePipe } from './fabric-agent'
 import { decodeFabricEnvelope, encodeFabricEnvelope, toFabricSessionEnvelope } from './fabric-envelope'
 import { FabricSession } from './session'
-import { WebSocketEnvelopePipe } from './websocket-envelope-pipe'
 
 interface ActiveStream { socket: net.Socket, writer: FabricHttpRequestWriter }
 
@@ -79,9 +79,14 @@ export class FabricNodeConnector {
     if (!membership || membership.role === 'pending-node') { return }
     const secretRefs = requireFabricMembershipSecretRefs()
     const headers = fabricAuthHeaders(membership.nodeCertificate, readSecret(secretRefs.identityKeySecretId), 'GET', '/v1/ws/nodes')
-    const url = new URL('/v1/ws/nodes', `${membership.relayUrl}/`); url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
     const reconnect = () => { if (!this.stopped && this.pipe === pipe) { this.pipe = null; this.reconnectTimer = setTimeout(() => void this.connect(), 1_000); this.reconnectTimer.unref?.() } }
-    const pipe: EnvelopePipe = new WebSocketEnvelopePipe(url, fabricHeadersRecord(headers), {
+    const pipe: EnvelopePipe = connectEnvelopePipe({
+      role: 'node',
+      relayUrl: membership.relayUrl,
+      fabricId: membership.fabricId,
+      nodeId: membership.nodeCertificate.subjectId,
+      headers: fabricHeadersRecord(headers),
+    }, {
       onOpen: () => {
         this.logger.info('Fabric Node connected to relay', {
           fabricId: membership.fabricId,
