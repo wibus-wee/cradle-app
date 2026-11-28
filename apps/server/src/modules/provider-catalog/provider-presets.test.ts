@@ -158,6 +158,19 @@ describe('collectProviderPresets', () => {
       providerId: 'ollama',
       tier: 'first-class',
     })
+    // Magpie's local subscription-pooling gateway is a curated local entry
+    // on its documented loopback port, keyless as loopback accepts any token.
+    const magpie = byId.get('magpie')
+    expect(magpie).toMatchObject({
+      baseUrl: 'http://127.0.0.1:3425/v1',
+      providerKind: 'openai-compatible',
+      local: true,
+      requiresApiKey: false,
+      source: 'overlay',
+      providerId: 'magpie',
+      tier: 'first-class',
+    })
+
     const volcengine = byId.get('volcengine-ark-coding')
     expect(volcengine).toMatchObject({
       providerKind: 'anthropic',

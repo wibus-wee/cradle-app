@@ -243,6 +243,15 @@ const OVERLAY_SINGLE: ProviderSetupContribution[] = [
     local: true,
     requiresApiKey: false,
   }),
+  singleProfileFirstClass({
+    id: 'magpie',
+    name: 'Magpie',
+    wireKind: 'openai-compatible',
+    baseUrl: 'http://127.0.0.1:3425/v1',
+    docsUrl: 'https://github.com/yetone/magpie',
+    local: true,
+    requiresApiKey: false,
+  }),
 ]
 
 const byId = new Map<ProviderId, ProviderSetupContribution>()

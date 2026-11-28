@@ -136,4 +136,22 @@ export const PROVIDER_PRESET_OVERLAY: ProviderPresetOverlayEntry[] = [
     local: true,
     requiresApiKey: false,
   },
+  {
+    // Magpie (github.com/yetone/magpie) pools AI coding subscriptions behind
+    // a local gateway speaking OpenAI Chat Completions, Responses, and
+    // Anthropic Messages on 127.0.0.1:3425. The OpenAI-compatible endpoint is
+    // the single contribution surface: the gateway translates to whichever
+    // upstream protocol the pooled account speaks. Its model ids carry the
+    // pooled provider prefix (`<provider>/<model>`) as /v1/models lists them.
+    // Loopback requests are accepted with any bearer token, so no API key is
+    // required locally; a gateway shared on the LAN enforces its own keys.
+    id: 'magpie',
+    name: 'Magpie',
+    providerKind: 'openai-compatible',
+    baseUrl: 'http://127.0.0.1:3425/v1',
+    hostnames: ['127.0.0.1', 'localhost'],
+    docsUrl: 'https://github.com/yetone/magpie',
+    local: true,
+    requiresApiKey: false,
+  },
 ]
