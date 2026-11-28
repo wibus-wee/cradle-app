@@ -22,9 +22,6 @@ importers:
       '@agentclientprotocol/sdk':
         specifier: 1.4.0
         version: 1.4.0(zod@4.5.4)
-      '@ai-sdk/openai':
-        specifier: ^3.0.53
-        version: 3.0.53(zod@4.5.4)
       '@base-ui/react':
         specifier: ^1.7.0
         version: 1.7.0(@date-fns/tz@1.4.1)(@types/react@19.2.18)(date-fns@4.4.0)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
@@ -140,8 +137,8 @@ importers:
         specifier: ^6.0.0
         version: 6.0.0
       ai:
-        specifier: ^6.0.168
-        version: 6.0.168(zod@4.5.4)
+        specifier: ^7.0.184
+        version: 7.0.184(zod@4.5.4)
       better-sqlite3:
         specifier: ^13.0.3
         version: 13.0.3
@@ -196,9 +193,6 @@ importers:
       next-themes:
         specifier: ^0.4.6
         version: 0.4.6(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
-      openai:
-        specifier: ^7.8.0
-        version: 7.8.0(@aws-sdk/credential-provider-node@3.972.46)(@smithy/signature-v4@5.4.5)(undici@8.10.0)(ws@8.21.3)(zod@4.5.4)
       pathe:
         specifier: ^2.0.3
         version: 2.0.3
@@ -507,8 +501,8 @@ importers:
         specifier: ^5.102.8
         version: 5.102.8(react@19.2.3)
       ai:
-        specifier: ^6.0.168
-        version: 6.0.168(zod@4.5.4)
+        specifier: ^7.0.184
+        version: 7.0.184(zod@4.5.4)
       expo:
         specifier: ~57.0.34
         version: 57.0.34(@babel/core@7.29.7(supports-color@11.0.0))(@expo/dom-webview@57.0.1)(@expo/metro-runtime@57.0.19)(expo-router@57.0.32)(react-dom@19.2.3(react@19.2.3))(react-native-web@0.21.2(encoding@0.1.13)(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(react-native-worklets@0.10.1(@babel/core@7.29.7(supports-color@11.0.0))(@react-native/metro-config@0.86.3(@babel/core@7.29.7(supports-color@11.0.0))(supports-color@11.0.0))(react-native@0.86.3(@babel/core@7.29.7(supports-color@11.0.0))(@react-native/metro-config@0.86.3(@babel/core@7.29.7(supports-color@11.0.0))(supports-color@11.0.0))(@types/react@19.2.18)(react@19.2.3)(supports-color@11.0.0))(react@19.2.3)(supports-color@11.0.0))(react-native@0.86.3(@babel/core@7.29.7(supports-color@11.0.0))(@react-native/metro-config@0.86.3(@babel/core@7.29.7(supports-color@11.0.0))(supports-color@11.0.0))(@types/react@19.2.18)(react@19.2.3)(supports-color@11.0.0))(react@19.2.3)(supports-color@11.0.0)(typescript@6.0.3)
@@ -658,20 +652,20 @@ importers:
   apps/server:
     dependencies:
       '@ai-sdk/anthropic':
-        specifier: ^3.0.76
-        version: 3.0.76(zod@4.5.4)
+        specifier: ^4.0.111
+        version: 4.0.111(zod@4.5.4)
       '@ai-sdk/google':
-        specifier: ^3.0.72
-        version: 3.0.72(zod@4.5.4)
+        specifier: ^4.0.128
+        version: 4.0.128(zod@4.5.4)
       '@ai-sdk/openai':
-        specifier: ^3.0.53
-        version: 3.0.53(zod@4.5.4)
+        specifier: ^4.0.125
+        version: 4.0.125(zod@4.5.4)
+      '@ai-sdk/otel':
+        specifier: ^1.0.184
+        version: 1.0.184(zod@4.5.4)
       '@anthropic-ai/claude-agent-sdk':
-        specifier: 0.3.261
-        version: 0.3.261(@anthropic-ai/sdk@0.115.0(zod@4.5.4))(@modelcontextprotocol/sdk@1.30.0(supports-color@5.5.0)(zod@4.5.4))(zod@4.5.4)
-      '@anthropic-ai/sdk':
-        specifier: 0.115.0
-        version: 0.115.0(zod@4.5.4)
+        specifier: 0.3.332
+        version: 0.3.332(@anthropic-ai/sdk@0.115.0(zod@4.5.4))(@modelcontextprotocol/sdk@1.32.2(supports-color@5.5.0)(zod@4.5.4))(zod@4.5.4)
       '@arcships/light-ocr':
         specifier: 0.5.7
         version: 0.5.7
@@ -710,7 +704,7 @@ importers:
         version: 0.10.5
       '@hijarvis/core':
         specifier: ^0.1.0
-        version: 0.1.0(@modelcontextprotocol/sdk@1.30.0(supports-color@5.5.0)(zod@4.5.4))(supports-color@5.5.0)(ws@8.21.3)
+        version: 0.1.0(@modelcontextprotocol/sdk@1.32.2(supports-color@5.5.0)(zod@4.5.4))(supports-color@5.5.0)(ws@8.21.3)
       '@hono/node-server':
         specifier: ^2.1.1
         version: 2.1.1(hono@4.13.5)
@@ -721,8 +715,8 @@ importers:
         specifier: ^5.11.0
         version: 5.11.0(@opentelemetry/api@1.9.1)
       '@modelcontextprotocol/sdk':
-        specifier: ^1.30.0
-        version: 1.30.0(supports-color@5.5.0)(zod@4.5.4)
+        specifier: ^1.32.2
+        version: 1.32.2(supports-color@5.5.0)(zod@4.5.4)
       '@noble/curves':
         specifier: ^2.4.0
         version: 2.4.0
@@ -739,8 +733,8 @@ importers:
         specifier: ^11.0.5
         version: 11.0.5(@octokit/core@7.0.6)
       '@opencode-ai/sdk':
-        specifier: ^1.18.25
-        version: 1.18.25
+        specifier: ^1.19.6
+        version: 1.19.6
       '@opentelemetry/api':
         specifier: ^1.9.1
         version: 1.9.1
@@ -793,8 +787,8 @@ importers:
         specifier: 0.0.5
         version: 0.0.5(hono@4.13.5)
       ai:
-        specifier: ^6.0.168
-        version: 6.0.168(zod@4.5.4)
+        specifier: ^7.0.184
+        version: 7.0.184(zod@4.5.4)
       ajv:
         specifier: 8.20.0
         version: 8.20.0
@@ -1085,8 +1079,8 @@ importers:
         specifier: ^12.11.5
         version: 12.11.5(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(immer@11.1.18)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       ai:
-        specifier: ^6.0.168
-        version: 6.0.168(zod@4.5.4)
+        specifier: ^7.0.184
+        version: 7.0.184(zod@4.5.4)
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -1299,8 +1293,8 @@ importers:
   apps/zhi-slack-bridge:
     dependencies:
       '@modelcontextprotocol/sdk':
-        specifier: ^1.30.0
-        version: 1.30.0(supports-color@11.0.0)(zod@4.5.4)
+        specifier: ^1.32.2
+        version: 1.32.2(supports-color@11.0.0)(zod@4.5.4)
       '@slack/bolt':
         specifier: ^5.0.0
         version: 5.0.0(@types/express@5.0.6)(supports-color@11.0.0)(undici@7.29.0)
@@ -1330,8 +1324,8 @@ importers:
   packages/ai-sdk:
     dependencies:
       ai:
-        specifier: ^6.0.168
-        version: 6.0.168(zod@4.5.4)
+        specifier: ^7.0.184
+        version: 7.0.184(zod@4.5.4)
     devDependencies:
       '@types/node':
         specifier: ^22.20.1
@@ -1368,8 +1362,8 @@ importers:
   packages/chat-runtime-contracts:
     dependencies:
       ai:
-        specifier: ^6.0.168
-        version: 6.0.168(zod@4.5.4)
+        specifier: ^7.0.184
+        version: 7.0.184(zod@4.5.4)
 
   packages/cli:
     dependencies:
@@ -1812,49 +1806,43 @@ packages:
     peerDependencies:
       zod: ^3.25.0 || ^4.0.0
 
-  '@ai-sdk/anthropic@3.0.76':
-    resolution: {integrity: sha512-kOuvT9e6PygFvgYpkr4v9gjvmcMPfJp79jaXjeRl9Gpoj2OXdtc3ero7o1ic+tiSBw5IMubxXFO68BCA/axGJA==}
-    engines: {node: '>=18'}
+  '@ai-sdk/anthropic@4.0.111':
+    resolution: {integrity: sha512-Y6lN45sqrbtGmETkFwf5vVknaJ860vS5UvHrPsWhKFfJt75xzDE954O8LaWXjjVvXtYJaPbwJJzoVFamXrfF8Q==}
+    engines: {node: '>=22'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
-  '@ai-sdk/gateway@3.0.104':
-    resolution: {integrity: sha512-ZKX5n74io8VIRlhIMSLWVlvT3sXC8Z7cZ9GHuWBWZDVi96+62AIsWuLGvMfcBA1STYuSoDrp6rIziZmvrTq0TA==}
-    engines: {node: '>=18'}
+  '@ai-sdk/gateway@4.0.157':
+    resolution: {integrity: sha512-2JL4w9I8pSoIONA9LJDdga+L57ousY2PxJrf+Qx2w4AEjYGynYjUTXNDLFvtmgYx9nfKx+8hQug8Z0YBeP+3yg==}
+    engines: {node: '>=22'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
-  '@ai-sdk/google@3.0.72':
-    resolution: {integrity: sha512-9EVG0AdUhs0hJ2+sqRb4IURZnsBahuU1CQELu+hfItm0wUTzxnVhIbQ4/jJkG/QFPtBUvMefCwDT7HX8T2HVbQ==}
-    engines: {node: '>=18'}
+  '@ai-sdk/google@4.0.128':
+    resolution: {integrity: sha512-xMgegT/mkDBWBq2LipGTXdKsETYXaMv96zbMn/1PVkD3l40QEygMv3pTy4+YD54MRvm3YKrx4HtWQ4MHcBl7+g==}
+    engines: {node: '>=22'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
-  '@ai-sdk/openai@3.0.53':
-    resolution: {integrity: sha512-Wld+Rbc05KaUn08uBt06eEuwcgalcIFtIl32Yp+GxuZXUQwOb6YeAuq+C6da4ch6BurFoqEaLemJVwjBb7x+PQ==}
-    engines: {node: '>=18'}
+  '@ai-sdk/openai@4.0.125':
+    resolution: {integrity: sha512-YKYn8DVW8YbosdshXfPbcX9J1EORv72TMnw7eLn8i3uX7lHtW+/on5V8cfeGJYci0boDvxv7yD8J7vUovIwaOQ==}
+    engines: {node: '>=22'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
-  '@ai-sdk/provider-utils@4.0.23':
-    resolution: {integrity: sha512-z8GlDaCmRSDlqkMF2f4/RFgWxdarvIbyuk+m6WXT1LYgsnGiXRJGTD2Z1+SDl3LqtFuRtGX1aghYvQLoHL/9pg==}
-    engines: {node: '>=18'}
+  '@ai-sdk/otel@1.0.184':
+    resolution: {integrity: sha512-pL9WyEUb4fTO6BKMD1BhSdEGpi+5KkodACAmRZzC7xiPdLxvEZxAEl5C2Gw1BZfzGfQDkTtx3MkIAwJuDxOOyw==}
+    engines: {node: '>=22'}
+
+  '@ai-sdk/provider-utils@5.0.85':
+    resolution: {integrity: sha512-kpqFmdbhtslrRKbEvX/FuazM/4ZWGweHRczGsz+NTk3lXfqfjLBRrEdyOn+kZV5Lr6RTkfZqH0C5ny/CTFwq+Q==}
+    engines: {node: '>=22'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
-  '@ai-sdk/provider-utils@4.0.27':
-    resolution: {integrity: sha512-ubkAJ+xODouwtmN1tYlvTPphH1hPOBfZaEQe8U7skGvFAnIRs9PPpsq57bC2+Ky/MB4yzhd6YOsxTAx9sGpazw==}
-    engines: {node: '>=18'}
-    peerDependencies:
-      zod: ^3.25.76 || ^4.1.8
-
-  '@ai-sdk/provider@3.0.10':
-    resolution: {integrity: sha512-Q3BZ27qfpYqnCYGvE3vt+Qi6LGOF9R5Nmzn+9JoM1lCRsD9mYaIhfJLkSunN48nfGXJ6n+XNV0J/XVpqGQl7Dw==}
-    engines: {node: '>=18'}
-
-  '@ai-sdk/provider@3.0.8':
-    resolution: {integrity: sha512-oGMAgGoQdBXbZqNG0Ze56CHjDZ1IDYOwGYxYjO5KLSlz5HiNQ9udIXsPZ61VWaHGZ5XW/jyjmr6t2xz2jGVwbQ==}
-    engines: {node: '>=18'}
+  '@ai-sdk/provider@4.0.39':
+    resolution: {integrity: sha512-jRvAhvW23+TeMGVCME2WGejP/TjzyDg7TplUep3t8HcEYnC2/8zqhCy9RRrjjVs1ljcygABZ8pQ21MbCRdF01w==}
+    engines: {node: '>=22'}
 
   '@alint-js/cli@0.7.1':
     resolution: {integrity: sha512-z2BKgCRfI7RGVbTSpKuiOLl6mgQksnXmp+Dvb7AOaY82jTSp93Mr+KP1YGGNJsKv3KY6h+r9hRRjR6VwQ1Gw2A==}
@@ -1942,53 +1930,53 @@ packages:
   '@antfu/install-pkg@1.1.0':
     resolution: {integrity: sha512-MGQsmw10ZyI+EJo45CdSER4zEb+p31LpDAFp2Z3gkSd1yqVZGi0Ebx++YTEMonJy4oChEMLsxZ64j8FH6sSqtQ==}
 
-  '@anthropic-ai/claude-agent-sdk-darwin-arm64@0.3.261':
-    resolution: {integrity: sha512-oI8SPd6g+xUF6EnEqIInxz5CjSSJXoDlaqefjbSJvTFCawGGBhxlQs0g9jzsYou6Rdu+i2tJBToJZLsKSnN/0Q==}
+  '@anthropic-ai/claude-agent-sdk-darwin-arm64@0.3.332':
+    resolution: {integrity: sha512-EFqYJyg1zpgQM3NxfOsOLCi2ktm8uYwgSR1DP9D6Z/InlQ0KSBbWAXL/s11itvLTAj6Pn15VeFtNJS7Ehw4xpg==}
     cpu: [arm64]
     os: [darwin]
 
-  '@anthropic-ai/claude-agent-sdk-darwin-x64@0.3.261':
-    resolution: {integrity: sha512-PODd45XbrKxwngebFmc60Xd68QDb7xCo+0toYTJKfFumU24b/JT2WpO5sTSfc5+fahd/P11q0uF5v9YeSjWmjg==}
+  '@anthropic-ai/claude-agent-sdk-darwin-x64@0.3.332':
+    resolution: {integrity: sha512-vHanIaflUZ5OGgkefYjLjUBfQfiduETCqFlnpvh3DjelEdpphDkBvVmYnPLgH1Lx/eAQBLbIwR8z0qry30u8Dw==}
     cpu: [x64]
     os: [darwin]
 
-  '@anthropic-ai/claude-agent-sdk-linux-arm64-musl@0.3.261':
-    resolution: {integrity: sha512-BAUG2EremVyy8bA14jKF35VRJjGE2TqREpFerA0CRBWg9/sUJZVWdmIRXUiXCKh0MvenPRUJbEgwcHFllQETOw==}
+  '@anthropic-ai/claude-agent-sdk-linux-arm64-musl@0.3.332':
+    resolution: {integrity: sha512-dlt1/pFZ4PNTsmSa/cS3m/DD4D17c5S7LEtlD0I8Ue4jbTIdYaNZOIUOYulhy9iD4Eoa47rWfP9L8MkmCrCMUg==}
     cpu: [arm64]
     os: [linux]
     libc: [musl]
 
-  '@anthropic-ai/claude-agent-sdk-linux-arm64@0.3.261':
-    resolution: {integrity: sha512-C+y3N3MD2ExrwrbCYcbLdM39VkbJkQKUv23oubvoZr0CtHiH2LESyUUC3JsUbHJ1TRKO8fbzLqvPkjZ9UsBIcw==}
+  '@anthropic-ai/claude-agent-sdk-linux-arm64@0.3.332':
+    resolution: {integrity: sha512-sFApHjuWc+1+1cPoEvC9OpSKv+1LxWQJisjgGK2zIVXE+tBGYSodbsVvhLfLHFKc3pWEnqm90QqUqEQ+v+5vWA==}
     cpu: [arm64]
     os: [linux]
     libc: [glibc]
 
-  '@anthropic-ai/claude-agent-sdk-linux-x64-musl@0.3.261':
-    resolution: {integrity: sha512-H7sCtM7X9OyQ+ZCEhh6TY/Z1i+5WIn8YyHRVJ2LrZRFOaszPeDbl1SzSxxuOd5ibwJZA9gx+2uQ78dx+bDkQUA==}
+  '@anthropic-ai/claude-agent-sdk-linux-x64-musl@0.3.332':
+    resolution: {integrity: sha512-weDfrdbgQVDuIKjk4kMoQA2x+/FPCpWno/5a9tDKeYg+jbqjIhlpvfvniteEjViL7GVf/U3SfTrjHljylsvSSg==}
     cpu: [x64]
     os: [linux]
     libc: [musl]
 
-  '@anthropic-ai/claude-agent-sdk-linux-x64@0.3.261':
-    resolution: {integrity: sha512-MdojjfN0HJHT0JMiZJ6rTj3/ODNi5OdY0py1JZmVVEVTYOdvgH6OG3oy9/BmmJTx0mp/BBCHbOGNpibtnqE+1g==}
+  '@anthropic-ai/claude-agent-sdk-linux-x64@0.3.332':
+    resolution: {integrity: sha512-jcy9+qHfZp8chlyAzugVCDSVoMv3lNIrDxuWo8ukM2SkZWJn0pr4K8sXhJIKbUIvbGrZhZeY5E68zPHNfpv6Sw==}
     cpu: [x64]
     os: [linux]
     libc: [glibc]
 
-  '@anthropic-ai/claude-agent-sdk-win32-arm64@0.3.261':
-    resolution: {integrity: sha512-zvZfec4+wDooqF/ZOI3lthgq9WfZLIrSserS6tULpBqCLKNRbTIpARDcljY7SrRuMGb3Ex+LFn/yXazgajpwzg==}
+  '@anthropic-ai/claude-agent-sdk-win32-arm64@0.3.332':
+    resolution: {integrity: sha512-FWzNarl2AiOzNlF6FQZRFMN1t75elEdDsgVfrB+yIlMZeoMZG9OhFv38oWfgcVbZe4Hv+sR0VEQ5aYRtFDh0AQ==}
     cpu: [arm64]
     os: [win32]
 
-  '@anthropic-ai/claude-agent-sdk-win32-x64@0.3.261':
-    resolution: {integrity: sha512-tepSwNpNsl4tyDdJ1+YcRXeY7VZNirPqpCtKDuh2YVwDkMfzQevCqojURtACAdLwI8BUXeOGaecwRbh3zoSUtA==}
+  '@anthropic-ai/claude-agent-sdk-win32-x64@0.3.332':
+    resolution: {integrity: sha512-UgAe9yBXZJU3km8SY2/jRetE16HpPtWhEcfmQscS4PQFwqGvKHbpUjIZ6J917gAKA8jpJ2PRtDNpDHvCcgrOqg==}
     cpu: [x64]
     os: [win32]
 
-  '@anthropic-ai/claude-agent-sdk@0.3.261':
-    resolution: {integrity: sha512-CDG9z14JVKYRHjpp/g6zJ2k8xM5uSoRgjGdpTiK9woLDZxXtXcxV93ipCh55jQ3REj7M7H3GieMsETGZXB/ydw==}
-    engines: {node: '>=18.0.0'}
+  '@anthropic-ai/claude-agent-sdk@0.3.332':
+    resolution: {integrity: sha512-N0ejnrTLMNJYXkvhdmLEy8QSfjym2ljJCkUBCrLKesYNGgqooi8zHDHawNsi+An6zav/ImPnpi27sbRsRjfcOw==}
+    engines: {node: '>=18.14.0'}
     peerDependencies:
       '@anthropic-ai/sdk': '>=0.93.0'
       '@modelcontextprotocol/sdk': ^1.29.0
@@ -4399,6 +4387,16 @@ packages:
       '@cfworker/json-schema':
         optional: true
 
+  '@modelcontextprotocol/sdk@1.32.2':
+    resolution: {integrity: sha512-SWsVtH/0vULSQStoZ6xxH2K09Li8fXYTMC64ZeogCdpZ3XSi1eCPOByV1OpuJxuI3OcmHhosDWYyii07tpPsLw==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      '@cfworker/json-schema': ^4.1.1
+      zod: ^3.25 || ^4.0
+    peerDependenciesMeta:
+      '@cfworker/json-schema':
+        optional: true
+
   '@moeru/std@0.1.0-beta.20':
     resolution: {integrity: sha512-09Nunc5dLT0+oAaLV18nIGHLkQO3LOUGOpGcQ2VIFTqWybJojT9geawhTVtuclYcJtIApgIt+3BLWI1K9dYpFw==}
 
@@ -4818,8 +4816,8 @@ packages:
   '@open-draft/until@2.1.0':
     resolution: {integrity: sha512-U69T3ItWHvLwGg5eJ0n3I62nWuE6ilHlmz7zM0npLBRvPRd7e6NYmg54vvRtP5mZG7kZqZCFVdsTWo7BPtBujg==}
 
-  '@opencode-ai/sdk@1.18.25':
-    resolution: {integrity: sha512-GwgwhW+vE8FWSDw730SjzqNhsWXB0uJjbFOiqFkmM+USFuG13HuTlGe6SR2ixt+WXxoD6FV1hILWqsXyqej9hQ==}
+  '@opencode-ai/sdk@1.19.6':
+    resolution: {integrity: sha512-jYV7s+Tlc5jDILOyWFIgISkPlfk7z3ByqeC8/T9aESZBgSZosQR784U2UoM3ZrJ8S0LJ2cB+IA9xZN7Jj8tnhQ==}
 
   '@opentelemetry/api-logs@0.220.0':
     resolution: {integrity: sha512-CmVa4ImJ+ynfrPMNaAXHET6Bhb44SwzmfyVJFq9ni2jgXJR/l7C6gfVFddNmHP+ZOkP9cf4f9DBe68qVLTHc9w==}
@@ -4827,10 +4825,6 @@ packages:
 
   '@opentelemetry/api-logs@0.221.0':
     resolution: {integrity: sha512-OlanaW1vv7ufTqQ3/fPLI4arGt5ZoM+P8abOMki6uEYnpRazepSWDwDnnw+la7kE26SHVC18//SMccrDvLKOXQ==}
-    engines: {node: '>=8.0.0'}
-
-  '@opentelemetry/api@1.9.0':
-    resolution: {integrity: sha512-3giAOQvZiH5F9bMlMiv8+GSPMeqg0dbaeo58/0SlA9sxSqZhnUtxzX9/2FzyhS9sWQf5S0GJE0AKBrFqjpeYcg==}
     engines: {node: '>=8.0.0'}
 
   '@opentelemetry/api@1.9.1':
@@ -9249,6 +9243,9 @@ packages:
   '@webcontainer/env@1.1.1':
     resolution: {integrity: sha512-6aN99yL695Hi9SuIk1oC88l9o0gmxL1nGWWQ/kNy81HigJ0FoaoTXpytCj6ItzgyCEwA9kF1wixsTuv5cjsgng==}
 
+  '@workflow/serde@4.1.0':
+    resolution: {integrity: sha512-pav4F2BoirECWR7Nf1TKt+2eETcBj7jj4cBefQ8VXQCA6NPkaKeLfj/zMgi+3zYV5ZIBT4GuUiphsj0/b9hPQQ==}
+
   '@xmldom/xmldom@0.8.13':
     resolution: {integrity: sha512-KRYzxepc14G/CEpEGc3Yn+JKaAeT63smlDr+vjB8jRfgTBBI9wRj/nkQEO+ucV8p8I9bfKLWp37uHgFrbntPvw==}
     engines: {node: '>=10.0.0'}
@@ -9620,9 +9617,9 @@ packages:
     resolution: {integrity: sha512-7NRMZ/ZDz2vHevQTgJsocBFpakB1/Wx5ip19YSJuj4VOXpraWztTerViNtdSyARKZT9e2yVwUUB5JXXCE7mNrA==}
     hasBin: true
 
-  ai@6.0.168:
-    resolution: {integrity: sha512-2HqCJuO+1V2aV7vfYs5LFEUfxbkGX+5oa54q/gCCTL7KLTdbxcCu5D7TdLA5kwsrs3Szgjah9q6D9tpjHM3hUQ==}
-    engines: {node: '>=18'}
+  ai@7.0.184:
+    resolution: {integrity: sha512-IiRPrPtvbc6xhkDCsj3xsTXrCvQWYZdHs+KXKQmvAMcQ/x62qFVD2lQE9EkZkUPxhWTzf1n70B2SUPS9qHR6lA==}
+    engines: {node: '>=22'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
@@ -11594,6 +11591,10 @@ packages:
 
   eventsource-parser@3.1.0:
     resolution: {integrity: sha512-kJezFj9YFAMLeORyi7aCLxLbD5/qWMQnoMVlVPyHIll7lgRJCc3JVln9Vgl9nwQi0YkMnhdGTMNn7CkRRAptMg==}
+    engines: {node: '>=18.0.0'}
+
+  eventsource-parser@3.1.1:
+    resolution: {integrity: sha512-EKN1vKAMcZ8MlYMpaNuxN6R9yakzH6uajHcHVTqWJzvu5pWw9DyhbP35HH8MVBQ+dZjAfDxk+A8NiR9KWaXiyQ==}
     engines: {node: '>=18.0.0'}
 
   eventsource-parser@4.1.0:
@@ -17096,50 +17097,48 @@ snapshots:
     dependencies:
       zod: 4.5.4
 
-  '@ai-sdk/anthropic@3.0.76(zod@4.5.4)':
+  '@ai-sdk/anthropic@4.0.111(zod@4.5.4)':
     dependencies:
-      '@ai-sdk/provider': 3.0.10
-      '@ai-sdk/provider-utils': 4.0.27(zod@4.5.4)
+      '@ai-sdk/provider': 4.0.39
+      '@ai-sdk/provider-utils': 5.0.85(zod@4.5.4)
       zod: 4.5.4
 
-  '@ai-sdk/gateway@3.0.104(zod@4.5.4)':
+  '@ai-sdk/gateway@4.0.157(zod@4.5.4)':
     dependencies:
-      '@ai-sdk/provider': 3.0.8
-      '@ai-sdk/provider-utils': 4.0.23(zod@4.5.4)
+      '@ai-sdk/provider': 4.0.39
+      '@ai-sdk/provider-utils': 5.0.85(zod@4.5.4)
       '@vercel/oidc': 3.2.0
       zod: 4.5.4
 
-  '@ai-sdk/google@3.0.72(zod@4.5.4)':
+  '@ai-sdk/google@4.0.128(zod@4.5.4)':
     dependencies:
-      '@ai-sdk/provider': 3.0.10
-      '@ai-sdk/provider-utils': 4.0.27(zod@4.5.4)
+      '@ai-sdk/provider': 4.0.39
+      '@ai-sdk/provider-utils': 5.0.85(zod@4.5.4)
       zod: 4.5.4
 
-  '@ai-sdk/openai@3.0.53(zod@4.5.4)':
+  '@ai-sdk/openai@4.0.125(zod@4.5.4)':
     dependencies:
-      '@ai-sdk/provider': 3.0.8
-      '@ai-sdk/provider-utils': 4.0.23(zod@4.5.4)
+      '@ai-sdk/provider': 4.0.39
+      '@ai-sdk/provider-utils': 5.0.85(zod@4.5.4)
       zod: 4.5.4
 
-  '@ai-sdk/provider-utils@4.0.23(zod@4.5.4)':
+  '@ai-sdk/otel@1.0.184(zod@4.5.4)':
     dependencies:
-      '@ai-sdk/provider': 3.0.8
+      '@ai-sdk/provider': 4.0.39
+      '@opentelemetry/api': 1.9.1
+      ai: 7.0.184(zod@4.5.4)
+    transitivePeerDependencies:
+      - zod
+
+  '@ai-sdk/provider-utils@5.0.85(zod@4.5.4)':
+    dependencies:
+      '@ai-sdk/provider': 4.0.39
       '@standard-schema/spec': 1.1.0
-      eventsource-parser: 3.1.0
+      '@workflow/serde': 4.1.0
+      eventsource-parser: 3.1.1
       zod: 4.5.4
 
-  '@ai-sdk/provider-utils@4.0.27(zod@4.5.4)':
-    dependencies:
-      '@ai-sdk/provider': 3.0.10
-      '@standard-schema/spec': 1.1.0
-      eventsource-parser: 3.1.0
-      zod: 4.5.4
-
-  '@ai-sdk/provider@3.0.10':
-    dependencies:
-      json-schema: 0.4.0
-
-  '@ai-sdk/provider@3.0.8':
+  '@ai-sdk/provider@4.0.39':
     dependencies:
       json-schema: 0.4.0
 
@@ -17243,7 +17242,7 @@ snapshots:
   '@alint-js/model-adapter-acp@0.7.1(crossws@0.4.12(srvx@0.11.22))(supports-color@5.5.0)(typescript@6.0.3)':
     dependencies:
       '@agentclientprotocol/sdk': 1.4.0(zod@4.5.4)
-      '@modelcontextprotocol/sdk': 1.30.0(supports-color@5.5.0)(zod@4.5.4)
+      '@modelcontextprotocol/sdk': 1.32.2(supports-color@5.5.0)(zod@4.5.4)
       h3: 2.0.1-rc.25(crossws@0.4.12(srvx@0.11.22))
       tinyexec: 1.3.0
       valibot: 1.4.2(typescript@6.0.3)
@@ -17320,44 +17319,44 @@ snapshots:
       package-manager-detector: 1.8.0
       tinyexec: 1.3.0
 
-  '@anthropic-ai/claude-agent-sdk-darwin-arm64@0.3.261':
+  '@anthropic-ai/claude-agent-sdk-darwin-arm64@0.3.332':
     optional: true
 
-  '@anthropic-ai/claude-agent-sdk-darwin-x64@0.3.261':
+  '@anthropic-ai/claude-agent-sdk-darwin-x64@0.3.332':
     optional: true
 
-  '@anthropic-ai/claude-agent-sdk-linux-arm64-musl@0.3.261':
+  '@anthropic-ai/claude-agent-sdk-linux-arm64-musl@0.3.332':
     optional: true
 
-  '@anthropic-ai/claude-agent-sdk-linux-arm64@0.3.261':
+  '@anthropic-ai/claude-agent-sdk-linux-arm64@0.3.332':
     optional: true
 
-  '@anthropic-ai/claude-agent-sdk-linux-x64-musl@0.3.261':
+  '@anthropic-ai/claude-agent-sdk-linux-x64-musl@0.3.332':
     optional: true
 
-  '@anthropic-ai/claude-agent-sdk-linux-x64@0.3.261':
+  '@anthropic-ai/claude-agent-sdk-linux-x64@0.3.332':
     optional: true
 
-  '@anthropic-ai/claude-agent-sdk-win32-arm64@0.3.261':
+  '@anthropic-ai/claude-agent-sdk-win32-arm64@0.3.332':
     optional: true
 
-  '@anthropic-ai/claude-agent-sdk-win32-x64@0.3.261':
+  '@anthropic-ai/claude-agent-sdk-win32-x64@0.3.332':
     optional: true
 
-  '@anthropic-ai/claude-agent-sdk@0.3.261(@anthropic-ai/sdk@0.115.0(zod@4.5.4))(@modelcontextprotocol/sdk@1.30.0(supports-color@5.5.0)(zod@4.5.4))(zod@4.5.4)':
+  '@anthropic-ai/claude-agent-sdk@0.3.332(@anthropic-ai/sdk@0.115.0(zod@4.5.4))(@modelcontextprotocol/sdk@1.32.2(supports-color@5.5.0)(zod@4.5.4))(zod@4.5.4)':
     dependencies:
       '@anthropic-ai/sdk': 0.115.0(zod@4.5.4)
-      '@modelcontextprotocol/sdk': 1.30.0(supports-color@5.5.0)(zod@4.5.4)
+      '@modelcontextprotocol/sdk': 1.32.2(supports-color@5.5.0)(zod@4.5.4)
       zod: 4.5.4
     optionalDependencies:
-      '@anthropic-ai/claude-agent-sdk-darwin-arm64': 0.3.261
-      '@anthropic-ai/claude-agent-sdk-darwin-x64': 0.3.261
-      '@anthropic-ai/claude-agent-sdk-linux-arm64': 0.3.261
-      '@anthropic-ai/claude-agent-sdk-linux-arm64-musl': 0.3.261
-      '@anthropic-ai/claude-agent-sdk-linux-x64': 0.3.261
-      '@anthropic-ai/claude-agent-sdk-linux-x64-musl': 0.3.261
-      '@anthropic-ai/claude-agent-sdk-win32-arm64': 0.3.261
-      '@anthropic-ai/claude-agent-sdk-win32-x64': 0.3.261
+      '@anthropic-ai/claude-agent-sdk-darwin-arm64': 0.3.332
+      '@anthropic-ai/claude-agent-sdk-darwin-x64': 0.3.332
+      '@anthropic-ai/claude-agent-sdk-linux-arm64': 0.3.332
+      '@anthropic-ai/claude-agent-sdk-linux-arm64-musl': 0.3.332
+      '@anthropic-ai/claude-agent-sdk-linux-x64': 0.3.332
+      '@anthropic-ai/claude-agent-sdk-linux-x64-musl': 0.3.332
+      '@anthropic-ai/claude-agent-sdk-win32-arm64': 0.3.332
+      '@anthropic-ai/claude-agent-sdk-win32-x64': 0.3.332
 
   '@anthropic-ai/sdk@0.115.0(zod@4.5.4)':
     dependencies:
@@ -19755,14 +19754,14 @@ snapshots:
 
   '@fontsource-variable/sn-pro@5.3.0': {}
 
-  '@google/genai@1.52.0(@modelcontextprotocol/sdk@1.30.0(supports-color@5.5.0)(zod@4.5.4))(supports-color@5.5.0)':
+  '@google/genai@1.52.0(@modelcontextprotocol/sdk@1.32.2(supports-color@5.5.0)(zod@4.5.4))(supports-color@5.5.0)':
     dependencies:
       google-auth-library: 10.6.2(supports-color@5.5.0)
       p-retry: 4.6.2
       protobufjs: 7.6.1
       ws: 8.21.3
     optionalDependencies:
-      '@modelcontextprotocol/sdk': 1.30.0(supports-color@5.5.0)(zod@4.5.4)
+      '@modelcontextprotocol/sdk': 1.32.2(supports-color@5.5.0)(zod@4.5.4)
     transitivePeerDependencies:
       - bufferutil
       - supports-color
@@ -19834,10 +19833,10 @@ snapshots:
 
   '@hey-api/types@0.1.4': {}
 
-  '@hijarvis/core@0.1.0(@modelcontextprotocol/sdk@1.30.0(supports-color@5.5.0)(zod@4.5.4))(supports-color@5.5.0)(ws@8.21.3)':
+  '@hijarvis/core@0.1.0(@modelcontextprotocol/sdk@1.32.2(supports-color@5.5.0)(zod@4.5.4))(supports-color@5.5.0)(ws@8.21.3)':
     dependencies:
-      '@mariozechner/pi-agent-core': 0.65.2(@modelcontextprotocol/sdk@1.30.0(supports-color@5.5.0)(zod@4.5.4))(supports-color@5.5.0)(ws@8.21.3)(zod@4.5.4)
-      '@mariozechner/pi-ai': 0.65.2(@modelcontextprotocol/sdk@1.30.0(supports-color@5.5.0)(zod@4.5.4))(supports-color@5.5.0)(ws@8.21.3)(zod@4.5.4)
+      '@mariozechner/pi-agent-core': 0.65.2(@modelcontextprotocol/sdk@1.32.2(supports-color@5.5.0)(zod@4.5.4))(supports-color@5.5.0)(ws@8.21.3)(zod@4.5.4)
+      '@mariozechner/pi-ai': 0.65.2(@modelcontextprotocol/sdk@1.32.2(supports-color@5.5.0)(zod@4.5.4))(supports-color@5.5.0)(ws@8.21.3)(zod@4.5.4)
       err-code: 3.0.1
       execa: 9.6.1
       pino: 10.3.1
@@ -20216,9 +20215,9 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@mariozechner/pi-agent-core@0.65.2(@modelcontextprotocol/sdk@1.30.0(supports-color@5.5.0)(zod@4.5.4))(supports-color@5.5.0)(ws@8.21.3)(zod@4.5.4)':
+  '@mariozechner/pi-agent-core@0.65.2(@modelcontextprotocol/sdk@1.32.2(supports-color@5.5.0)(zod@4.5.4))(supports-color@5.5.0)(ws@8.21.3)(zod@4.5.4)':
     dependencies:
-      '@mariozechner/pi-ai': 0.65.2(@modelcontextprotocol/sdk@1.30.0(supports-color@5.5.0)(zod@4.5.4))(supports-color@5.5.0)(ws@8.21.3)(zod@4.5.4)
+      '@mariozechner/pi-ai': 0.65.2(@modelcontextprotocol/sdk@1.32.2(supports-color@5.5.0)(zod@4.5.4))(supports-color@5.5.0)(ws@8.21.3)(zod@4.5.4)
     transitivePeerDependencies:
       - '@modelcontextprotocol/sdk'
       - bufferutil
@@ -20227,11 +20226,11 @@ snapshots:
       - ws
       - zod
 
-  '@mariozechner/pi-ai@0.65.2(@modelcontextprotocol/sdk@1.30.0(supports-color@5.5.0)(zod@4.5.4))(supports-color@5.5.0)(ws@8.21.3)(zod@4.5.4)':
+  '@mariozechner/pi-ai@0.65.2(@modelcontextprotocol/sdk@1.32.2(supports-color@5.5.0)(zod@4.5.4))(supports-color@5.5.0)(ws@8.21.3)(zod@4.5.4)':
     dependencies:
       '@anthropic-ai/sdk': 0.73.0(zod@4.5.4)
       '@aws-sdk/client-bedrock-runtime': 3.1056.0
-      '@google/genai': 1.52.0(@modelcontextprotocol/sdk@1.30.0(supports-color@5.5.0)(zod@4.5.4))(supports-color@5.5.0)
+      '@google/genai': 1.52.0(@modelcontextprotocol/sdk@1.32.2(supports-color@5.5.0)(zod@4.5.4))(supports-color@5.5.0)
       '@mistralai/mistralai': 1.14.1
       '@sinclair/typebox': 0.34.52
       ajv: 8.20.0
@@ -20311,7 +20310,29 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@modelcontextprotocol/sdk@1.30.0(supports-color@5.5.0)(zod@4.5.4)':
+  '@modelcontextprotocol/sdk@1.32.2(supports-color@11.0.0)(zod@4.5.4)':
+    dependencies:
+      '@hono/node-server': 2.1.1(hono@4.13.5)
+      ajv: 8.20.0
+      ajv-formats: 3.0.1(ajv@8.20.0)
+      content-type: 1.0.5
+      cors: 2.8.6
+      cross-spawn: 7.0.6
+      eventsource: 3.0.7
+      eventsource-parser: 3.1.0
+      express: 5.2.1(supports-color@11.0.0)
+      express-rate-limit: 8.3.2(express@5.2.1(supports-color@11.0.0))
+      hono: 4.13.5
+      jose: 6.2.2
+      json-schema-typed: 8.0.2
+      pkce-challenge: 5.0.1
+      raw-body: 3.0.2
+      zod: 4.5.4
+      zod-to-json-schema: 3.25.2(zod@4.5.4)
+    transitivePeerDependencies:
+      - supports-color
+
+  '@modelcontextprotocol/sdk@1.32.2(supports-color@5.5.0)(zod@4.5.4)':
     dependencies:
       '@hono/node-server': 2.1.1(hono@4.13.5)
       ajv: 8.20.0
@@ -20731,7 +20752,7 @@ snapshots:
   '@open-draft/until@2.1.0':
     optional: true
 
-  '@opencode-ai/sdk@1.18.25':
+  '@opencode-ai/sdk@1.19.6':
     dependencies:
       cross-spawn: 7.0.6
 
@@ -20742,8 +20763,6 @@ snapshots:
   '@opentelemetry/api-logs@0.221.0':
     dependencies:
       '@opentelemetry/api': 1.9.1
-
-  '@opentelemetry/api@1.9.0': {}
 
   '@opentelemetry/api@1.9.1': {}
 
@@ -24980,6 +24999,8 @@ snapshots:
 
   '@webcontainer/env@1.1.1': {}
 
+  '@workflow/serde@4.1.0': {}
+
   '@xmldom/xmldom@0.8.13': {}
 
   '@xmldom/xmldom@0.9.10': {}
@@ -25262,12 +25283,11 @@ snapshots:
       prompts: 2.4.2
       yaml: 2.9.0
 
-  ai@6.0.168(zod@4.5.4):
+  ai@7.0.184(zod@4.5.4):
     dependencies:
-      '@ai-sdk/gateway': 3.0.104(zod@4.5.4)
-      '@ai-sdk/provider': 3.0.8
-      '@ai-sdk/provider-utils': 4.0.23(zod@4.5.4)
-      '@opentelemetry/api': 1.9.0
+      '@ai-sdk/gateway': 4.0.157(zod@4.5.4)
+      '@ai-sdk/provider': 4.0.39
+      '@ai-sdk/provider-utils': 5.0.85(zod@4.5.4)
       zod: 4.5.4
 
   ajv-formats@3.0.1(ajv@8.20.0):
@@ -27609,6 +27629,8 @@ snapshots:
       - bare-abort-controller
 
   eventsource-parser@3.1.0: {}
+
+  eventsource-parser@3.1.1: {}
 
   eventsource-parser@4.1.0: {}
 

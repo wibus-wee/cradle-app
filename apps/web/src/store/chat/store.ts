@@ -89,21 +89,32 @@ export function createChatStore() {
             return state
           }
 
-          return produce(base, (draft) => {
-            draft.messagesMap.set(sessionId, next)
-            // Drop legacy split ownership; cuts live in the transcript projection only.
-            for (const [sourceId] of draft.assistantDisplaySplitMap) {
-              if (previous?.some(m => m.id === sourceId) || next.some(m => m.id === sourceId)) {
-                draft.assistantDisplaySplitMap.delete(sourceId)
-              }
+          // Manual map copies instead of immer produce: AI SDK 7 UIMessage
+          // parts are recursively typed (steering-message), and immer's
+          // Draft<> expansion exceeds TypeScript's instantiation depth.
+          const messagesMap = new Map(base.messagesMap)
+          messagesMap.set(sessionId, next)
+          // Drop legacy split ownership; cuts live in the transcript projection only.
+          const assistantDisplaySplitMap = new Map(base.assistantDisplaySplitMap)
+          for (const [sourceId] of base.assistantDisplaySplitMap) {
+            if (previous?.some(m => m.id === sourceId) || next.some(m => m.id === sourceId)) {
+              assistantDisplaySplitMap.delete(sourceId)
             }
-            for (const id of removed) {
-              draft.errorMap.delete(id)
-            }
-            if (removedActiveMessage) {
-              draft.runStateMap.set(sessionId, DEFAULT_CHAT_RUN_STATE)
-            }
-          })
+          }
+          const errorMap = new Map(base.errorMap)
+          for (const id of removed) {
+            errorMap.delete(id)
+          }
+          const runStateMap = removedActiveMessage
+            ? new Map(base.runStateMap).set(sessionId, DEFAULT_CHAT_RUN_STATE)
+            : base.runStateMap
+          return {
+            ...base,
+            messagesMap,
+            assistantDisplaySplitMap,
+            errorMap,
+            runStateMap,
+          }
         })
       },
 

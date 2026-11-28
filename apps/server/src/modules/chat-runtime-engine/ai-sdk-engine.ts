@@ -2,7 +2,7 @@
 // Yields UIMessageChunk directly — no intermediate timeline abstraction
 
 import type { LanguageModel, LanguageModelUsage, ModelMessage, ToolSet, UIMessage, UIMessageChunk } from 'ai'
-import { convertToModelMessages, stepCountIs, streamText } from 'ai'
+import { convertToModelMessages, isStepCount, streamText, toUIMessageStream } from 'ai'
 
 import { aiTelemetryEnabled } from '../../telemetry/config'
 import { readChatPluginContextPart, readChatSkillContextPart } from '../chat-runtime/context-parts'
@@ -106,21 +106,22 @@ function createAiSdkStreamResult(input: AiSdkEngineInput): {
   const result = streamText({
     model,
     messages,
-    system,
+    instructions: system,
     tools,
     providerOptions,
-    stopWhen: maxSteps > 1 ? stepCountIs(maxSteps) : undefined,
+    stopWhen: maxSteps > 1 ? isStepCount(maxSteps) : undefined,
     abortSignal: effectiveAbortSignal,
-    experimental_telemetry: aiTelemetryEnabled()
-      ? {
-          isEnabled: true,
-          metadata: {
-            'langfuse.session.id': chatSessionId ?? '',
-            'langfuse.trace.name': 'ai-sdk-chat',
-          },
-        }
+    // Langfuse correlation keys travel in runtimeContext; the registered
+    // OpenTelemetry integration's enrichSpan copies langfuse.* keys verbatim
+    // onto spans (see telemetry/ai-sdk-registration.ts).
+    runtimeContext: {
+      'langfuse.session.id': chatSessionId ?? '',
+      'langfuse.trace.name': 'ai-sdk-chat',
+    },
+    telemetry: aiTelemetryEnabled()
+      ? { isEnabled: true }
       : undefined,
-    onStepFinish: (step) => {
+    onStepEnd: (step) => {
       if (onStepFinish && step.usage) {
         const hasToolCalls = step.toolCalls && step.toolCalls.length > 0
         const inferredStepType = step.stepNumber === 0
@@ -309,8 +310,9 @@ export async function* executeAiSdkTurn(input: AiSdkEngineInput): AsyncGenerator
   const originalMessages = input.originalMessages ?? (input.initialMessage ? [input.initialMessage] : undefined)
   const usageEmitter = createUsageEmitter(onUsage)
 
-  // Use toUIMessageStream() to get native UIMessageChunk events
-  const uiStream = result.toUIMessageStream({
+  // Convert the text stream to native UIMessageChunk events
+  const uiStream = toUIMessageStream({
+    stream: result.stream,
     generateMessageId: input.initialMessage ? () => input.initialMessage!.id : undefined,
     originalMessages,
     messageMetadata: ({ part }) => {

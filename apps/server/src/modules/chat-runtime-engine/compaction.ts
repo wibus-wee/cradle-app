@@ -105,7 +105,7 @@ export async function compactWithSummary(
 
     const summary = await generateText({
       model,
-      system: SUMMARIZATION_PROMPT,
+      instructions: SUMMARIZATION_PROMPT,
       prompt: conversationText,
     })
 
