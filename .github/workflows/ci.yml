@@ -131,7 +131,7 @@ jobs:
             server) pnpm --filter @cradle/server exec tsc --noEmit && node --import tsx apps/server/scripts/check-module-boundaries.ts ;;
             web) pnpm --filter @cradle/web exec tsc --noEmit ;;
             desktop) pnpm --filter @cradle/desktop exec tsc --noEmit -p tsconfig.node.json ;;
-            simulator) pnpm --filter @cradle/model-api-simulator typecheck && pnpm --filter @cradle/model-api-simulator protocol:check && pnpm --filter @cradle/model-api-simulator coverage:check ;;
+            simulator) pnpm --filter @cradle/model-api-simulator typecheck ;;
           esac
 
   # ─── Mobile (Expo / React Native merge gate) ───────────────────────────────

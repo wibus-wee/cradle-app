@@ -1,4 +1,8 @@
 node_modules
+# Committed symlinks bridging the model-api-simulator submodule to its
+# runtime dependencies in packages/model-api-simulator/node_modules.
+!vendor/node_modules
+!vendor/node_modules/**
 dist
 out
 .DS_Store

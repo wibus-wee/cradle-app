@@ -1,8 +1,6 @@
 {
   "compilerOptions": {
-    "composite": true,
     "target": "ES2022",
-    "rootDir": "./src",
     "module": "ESNext",
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
@@ -10,10 +8,8 @@
     "strict": true,
     "exactOptionalPropertyTypes": true,
     "noUncheckedIndexedAccess": true,
-    "declaration": true,
-    "outDir": "./dist",
     "esModuleInterop": true,
     "skipLibCheck": true
   },
-  "include": ["src/**/*", "src/**/*.json"]
+  "include": ["src/**/*", "../../vendor/model-api-simulator/src/**/*"]
 }
