@@ -54,6 +54,25 @@ describe('resolveRunRuntimeSettings', () => {
   })
 })
 
+describe('fast tier toggling on the codex runtime', () => {
+  const runtimeKind = 'codex'
+
+  it('clears the tier on an explicit empty value', () => {
+    expect(normalizeRuntimeSettingsPatch(runtimeKind, { serviceTier: '' })).toEqual({
+      serviceTier: '',
+    })
+    expect(resolveRunRuntimeSettings(
+      runtimeKind,
+      { accessMode: 'full-access', interactionMode: 'default', serviceTier: 'priority' },
+      { serviceTier: '' },
+    )).toEqual({ accessMode: 'full-access', interactionMode: 'default' })
+  })
+
+  it('still ignores values the runtime does not serve', () => {
+    expect(normalizeRuntimeSettingsPatch(runtimeKind, { serviceTier: 'ultrafast' })).toEqual({})
+  })
+})
+
 describe('standard runtime service tier settings', () => {
   const runtimeKind = 'standard'
 

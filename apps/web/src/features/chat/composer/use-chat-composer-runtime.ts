@@ -6,6 +6,7 @@ import { useCallback, useMemo } from 'react'
 import type { ModelDescriptor } from '~/features/agent-runtime/types'
 import { useProviderTargetModels } from '~/features/agent-runtime/use-agent-models'
 import { useRuntimeCatalog } from '~/features/agent-runtime/use-runtime-catalog'
+import { modelSupportsFastServiceTier } from '~/features/composer-toolbar/constants'
 import { useGitRepositories } from '~/features/git/shared/use-git'
 import { useChatPreferencesQuery } from '~/features/settings/use-chat-preferences'
 import { isElectron, platform } from '~/lib/electron'
@@ -272,8 +273,13 @@ export function useChatComposerRuntime({
         const modelState = runtimeUiSlotStates?.states.find(
           (state): state is ChatRuntimeModelUiSlotState => state.kind === 'model',
         )
+        // The tier is declared per model, so a runtime that supports fast mode
+        // still must not offer it for a model that serves only the default lane.
+        const availability = modelSupportsFastServiceTier(currentSessionModel)
+          ? undefined
+          : { enabled: false, reason: 'This model has no fast service tier.' }
         return {
-          ...withSlashCommandAvailability(command, undefined),
+          ...withSlashCommandAvailability(command, availability),
           ...(runtimeServiceTier === 'priority' || modelState?.serviceTier === 'priority'
             ? {
                 stateLabel: 'Active',
@@ -291,6 +297,7 @@ export function useChatComposerRuntime({
       gitRepositoriesQuery.isSuccess,
       runtimeUiSlotStates?.states,
       runtimeServiceTier,
+      currentSessionModel,
       workspaceId,
     ],
   )

@@ -124,6 +124,12 @@ function createProductSettingsEntry(input: {
         : {}
       const patch: RuntimeSettingsPatch = {}
       for (const field of input.fields) {
+        // An explicit empty string clears the setting: the patch channel has no
+        // delete, so toggles such as the fast service tier travel as ''.
+        if (record[field.key] === '') {
+          patch[field.key] = ''
+          continue
+        }
         const normalized = readStringEnum(record[field.key], field.allowed)
         if (normalized) {
           patch[field.key] = normalized
@@ -137,6 +143,10 @@ function createProductSettingsEntry(input: {
         return next
       }
       for (const field of input.fields) {
+        if (patch[field.key] === '') {
+          delete next[field.key]
+          continue
+        }
         const normalized = readStringEnum(patch[field.key], field.allowed)
         if (normalized) {
           next[field.key] = normalized
@@ -148,6 +158,10 @@ function createProductSettingsEntry(input: {
       return input.fields.every(field => left[field.key] === right[field.key])
     },
     isStaleDefaultPatch(patch, sessionSettings) {
+      if (input.fields.some(field => patch[field.key] === '')) {
+        // An explicit clear is user intent, never a stale default bundle.
+        return false
+      }
       const merged = this.merge({ ...this.defaults }, patch)
       const patchIsDefaultBundle = this.equals(merged, this.defaults)
       const sessionIsNonDefault = !this.equals(sessionSettings, this.defaults)

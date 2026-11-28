@@ -88,6 +88,24 @@ export function filterThinkingOptionsForModel<TThinking extends string | null>(
   })
 }
 
+/** Wire id of the OpenAI fast lane; gateways declare it as a service tier. */
+export const FAST_SERVICE_TIER_ID = 'priority'
+
+/**
+ * Fast mode is offered only for models whose inventory declares the fast tier.
+ * A model descriptor without the field cannot prove support, so it is treated as
+ * unsupported — the same rule the thinking ladder uses for undeclared efforts.
+ */
+export function modelSupportsFastServiceTier(
+  model: ModelDescriptor | null | undefined,
+): boolean {
+  const tiers = model?.capabilities.serviceTiers
+  if (tiers === undefined) {
+    return false
+  }
+  return tiers.some(tier => tier.id === FAST_SERVICE_TIER_ID)
+}
+
 export function selectSupportedThinkingValue<TThinking extends string | null>(
   model: ModelDescriptor | null | undefined,
   options: Array<ThinkingOption<TThinking>>,

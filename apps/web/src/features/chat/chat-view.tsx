@@ -641,7 +641,10 @@ export function ChatView({
       }
       if (command.action.actionId === RUNTIME_FAST_SERVICE_TIER_COMMAND_ACTION_ID) {
         try {
-          await runtimeSettings.update({ serviceTier: 'priority' })
+          // Fast mode is a toggle: an explicit empty tier returns the session to
+          // the model's default lane (the settings patch has no delete).
+          const fastApplied = runtimeSettings.settings.serviceTier === 'priority'
+          await runtimeSettings.update({ serviceTier: fastApplied ? '' : 'priority' })
           return { insertText: '' }
         }
         catch (error) {

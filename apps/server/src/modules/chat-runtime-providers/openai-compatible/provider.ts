@@ -4,6 +4,7 @@ import { appendHarnessFragmentsToSystemPrompt } from '../../chat-runtime/harness
 import type {
   CancelTurnInput,
   ChatRuntime,
+  GetCapabilitiesInput,
   ProviderContext,
   ResumeChatSessionInput,
   RuntimeSession,
@@ -32,6 +33,7 @@ import {
   STANDARD_RUNTIME_KIND,
   STANDARD_RUNTIME_METADATA,
 } from './metadata'
+import { createStandardRuntimePresentation } from './presentation'
 
 export function createStandardProvider(ctx: ProviderContext): ChatRuntime {
   return new OpenAICompatibleProvider(ctx)
@@ -45,6 +47,14 @@ export class OpenAICompatibleProvider implements ChatRuntime {
   private readonly activeTurns = new Map<string, AbortController>()
 
   constructor(private readonly deps: ProviderContext) {}
+
+  getDraftPresentation() {
+    return createStandardRuntimePresentation()
+  }
+
+  async getPresentation(_input: GetCapabilitiesInput) {
+    return createStandardRuntimePresentation()
+  }
 
   private releaseTurn(sessionId: string, abortController: AbortController): void {
     if (this.activeTurns.get(sessionId) === abortController) {

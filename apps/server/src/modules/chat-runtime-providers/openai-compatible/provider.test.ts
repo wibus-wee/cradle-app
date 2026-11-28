@@ -166,6 +166,20 @@ describe('openai compatible provider', () => {
     }))
   })
 
+  it('advertises fast mode through its presentation so the composer can offer it', async () => {
+    const provider = new OpenAICompatibleProvider(createProviderContext())
+    const presentation = await provider.getPresentation({
+      runtimeSession: createRuntimeSession(),
+      profile: createProfile(),
+      workspaceId: 'workspace-1',
+      workspacePath: '/tmp/workspace',
+      modelId: 'gpt-test',
+    })
+
+    expect(presentation.uiSlots.map(slot => slot.name)).toEqual(['fast'])
+    expect(provider.getDraftPresentation?.().uiSlots.map(slot => slot.name)).toEqual(['fast'])
+  })
+
   it('forwards a service tier only when the target declared it for the model', async () => {
     engineMocks.getProviderTargetServiceTierIds.mockReturnValue(['priority'])
     const provider = new OpenAICompatibleProvider(createProviderContext())
