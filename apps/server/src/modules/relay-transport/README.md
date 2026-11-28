@@ -45,8 +45,19 @@ Fabric membership rows, certificates, and directory access remain owned by
 - `websocket.ts`: shared state-aware teardown. Open sockets close gracefully;
   connecting or already-closing sockets terminate without calling the `ws`
   library's synchronously throwing CONNECTING `close()` path.
-- `controller-transport.ts`: controller-side WebSocket connection and local TCP
-  listener for one Fabric link. It returns the shared `LocalTunnelHandle`
+- `envelope-pipe.ts`: the minimal carriage contract for Fabric v3 envelopes —
+  connect/send/close plus open/message/error/close lifecycle. Pipes carry
+  complete, ordered envelopes and never reconnect, resume, or replay;
+  reconnection policy belongs to the connector and transport consumers.
+- `websocket-envelope-pipe.ts`: `EnvelopePipe` over a direct relayd WebSocket,
+  preserving the zero-copy inbound views and state-aware teardown.
+- `ipc-envelope-pipe.ts`: `EnvelopePipe` over the fabric-agent loopback IPC
+  contract (`apps/relayd/protocol`, "Fabric agent IPC"): length-prefixed JSON
+  auth frame first, then 4-byte big-endian length framing capped at 1 MiB.
+  Inbound frames are zero-copy views whenever one TCP chunk already holds a
+  complete frame; only fragmentation forces a single copy per frame.
+- `controller-transport.ts`: controller-side envelope pipe connection and local
+  TCP listener for one Fabric link. It returns the shared `LocalTunnelHandle`
   contract owned by `src/runtime/local-tunnel.ts`.
 - `node-connector.ts`: Node-side always-on connector with reconnect backoff and
   per-link `FabricSession` demultiplexing.

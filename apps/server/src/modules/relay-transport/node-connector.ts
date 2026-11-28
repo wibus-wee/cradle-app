@@ -1,8 +1,6 @@
 import { randomBytes } from 'node:crypto'
 import net from 'node:net'
 
-import WebSocket from 'ws'
-
 import { AppError } from '../../errors/app-error'
 import { CRADLE_RELAY_TOKEN_HEADER } from '../../http/auth'
 import { getLogger } from '../../logging/logger'
@@ -10,9 +8,10 @@ import type { MembershipCertificate } from '../fabric/protocol'
 import { assertFabricCertificate, fabricAuthHeaders, fabricHeadersRecord } from '../fabric/protocol'
 import { completeNodeEnrollment, getFabricMembership, hasPendingNodeEnrollment, registerLocalFabricController, requireFabricMembershipSecretRefs } from '../fabric/service'
 import { readSecret, upsertSecret } from '../secrets/service'
+import type { EnvelopePipe } from './envelope-pipe'
 import { decodeFabricEnvelope, encodeFabricEnvelope, toFabricSessionEnvelope } from './fabric-envelope'
 import { FabricSession } from './session'
-import { relayWebSocketDataView } from './websocket-data'
+import { WebSocketEnvelopePipe } from './websocket-envelope-pipe'
 
 interface ActiveStream { socket: net.Socket, writer: FabricHttpRequestWriter }
 
@@ -22,7 +21,7 @@ interface ActiveStream { socket: net.Socket, writer: FabricHttpRequestWriter }
  * never share byte accounting with another Controller.
  */
 export class FabricNodeConnector {
-  private ws: WebSocket | null = null
+  private pipe: EnvelopePipe | null = null
   private stopped = false
   private reconnectTimer: NodeJS.Timeout | null = null
   private enrollmentTimer: NodeJS.Timeout | null = null
@@ -38,7 +37,7 @@ export class FabricNodeConnector {
     if (hasPendingNodeEnrollment()) { void this.completeEnrollment() }
   }
 
-  stop(): void { this.stopped = true; if (this.reconnectTimer) { clearTimeout(this.reconnectTimer) } if (this.enrollmentTimer) { clearTimeout(this.enrollmentTimer) } this.reconnectTimer = null; this.enrollmentTimer = null; this.ws?.terminate(); this.ws = null; this.sessions.clear(); for (const streams of this.streams.values()) { for (const stream of streams.values()) { stream.socket.destroy() } } this.streams.clear() }
+  stop(): void { this.stopped = true; if (this.reconnectTimer) { clearTimeout(this.reconnectTimer) } if (this.enrollmentTimer) { clearTimeout(this.enrollmentTimer) } this.reconnectTimer = null; this.enrollmentTimer = null; this.pipe?.teardown(); this.pipe = null; this.sessions.clear(); for (const streams of this.streams.values()) { for (const stream of streams.values()) { stream.socket.destroy() } } this.streams.clear() }
 
   private async completeEnrollment(): Promise<void> {
     if (this.stopped || !hasPendingNodeEnrollment()) { return }
@@ -81,50 +80,51 @@ export class FabricNodeConnector {
     const secretRefs = requireFabricMembershipSecretRefs()
     const headers = fabricAuthHeaders(membership.nodeCertificate, readSecret(secretRefs.identityKeySecretId), 'GET', '/v1/ws/nodes')
     const url = new URL('/v1/ws/nodes', `${membership.relayUrl}/`); url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
-    const ws = new WebSocket(url, { headers: fabricHeadersRecord(headers) })
-    this.ws = ws
-    ws.once('open', () => {
-      this.logger.info('Fabric Node connected to relay', {
-        fabricId: membership.fabricId,
-        nodeId: membership.localNodeId,
-      })
-    })
-    ws.once('unexpected-response', (_request, response) => {
-      this.logger.warn('Fabric Node relay upgrade was rejected', {
-        fabricId: membership.fabricId,
-        nodeId: membership.localNodeId,
-        status: response.statusCode,
-      })
-    })
-    ws.on('message', (data) => {
-      try { this.handleEnvelope(relayWebSocketDataView(data), membership.nodeCertificate, readSecret(secretRefs.encryptionKeySecretId), membership.fabricId) }
-      catch (error) {
-        this.logger.warn('Fabric Node rejected inbound relay frame', {
+    const reconnect = () => { if (!this.stopped && this.pipe === pipe) { this.pipe = null; this.reconnectTimer = setTimeout(() => void this.connect(), 1_000); this.reconnectTimer.unref?.() } }
+    const pipe: EnvelopePipe = new WebSocketEnvelopePipe(url, fabricHeadersRecord(headers), {
+      onOpen: () => {
+        this.logger.info('Fabric Node connected to relay', {
           fabricId: membership.fabricId,
           nodeId: membership.localNodeId,
-          error: error instanceof Error ? error.message : String(error),
         })
-        ws.close(1008, 'Invalid Fabric frame')
-      }
+      },
+      onRejected: ({ statusCode }) => {
+        this.logger.warn('Fabric Node relay upgrade was rejected', {
+          fabricId: membership.fabricId,
+          nodeId: membership.localNodeId,
+          status: statusCode,
+        })
+      },
+      onMessage: (data) => {
+        try { this.handleEnvelope(data, membership.nodeCertificate, readSecret(secretRefs.encryptionKeySecretId), membership.fabricId) }
+        catch (error) {
+          this.logger.warn('Fabric Node rejected inbound relay frame', {
+            fabricId: membership.fabricId,
+            nodeId: membership.localNodeId,
+            error: error instanceof Error ? error.message : String(error),
+          })
+          pipe.close(1008, 'Invalid Fabric frame')
+        }
+      },
+      onError: (error) => {
+        this.logger.warn('Fabric Node relay connection failed', {
+          fabricId: membership.fabricId,
+          nodeId: membership.localNodeId,
+          error: error.message,
+        })
+        reconnect()
+      },
+      onClose: (code, reason) => {
+        this.logger.warn('Fabric Node relay connection closed', {
+          fabricId: membership.fabricId,
+          nodeId: membership.localNodeId,
+          code,
+          reason,
+        })
+        reconnect()
+      },
     })
-    const reconnect = () => { if (!this.stopped && this.ws === ws) { this.ws = null; this.reconnectTimer = setTimeout(() => void this.connect(), 1_000); this.reconnectTimer.unref?.() } }
-    ws.once('close', (code, reason) => {
-      this.logger.warn('Fabric Node relay connection closed', {
-        fabricId: membership.fabricId,
-        nodeId: membership.localNodeId,
-        code,
-        reason: reason.toString(),
-      })
-      reconnect()
-    })
-    ws.once('error', (error) => {
-      this.logger.warn('Fabric Node relay connection failed', {
-        fabricId: membership.fabricId,
-        nodeId: membership.localNodeId,
-        error: error.message,
-      })
-      reconnect()
-    })
+    this.pipe = pipe
   }
 
   private handleEnvelope(bytes: Uint8Array, nodeCertificate: MembershipCertificate, encryptionPrivateKey: string, fabricId: string): void {
@@ -149,7 +149,7 @@ export class FabricNodeConnector {
       ourPublicKeyBase64: nodeCertificate.encryptionPubkey,
       encodeOutboundEnvelope: frame => encodeFabricEnvelope({ fabricId, nodeId: nodeCertificate.subjectId, linkId }, frame),
     }, {
-      send: (data) => { if (this.ws?.readyState === WebSocket.OPEN) { this.ws.send(data) } },
+      send: (data) => { this.pipe?.send(data) },
       onStreamOpen: streamId => this.openStream(linkId, streamId, session),
       onStreamData: (streamId, data) => { const stream = streams.get(streamId); stream?.writer.write(data, consumed => session.reportStreamDataConsumed(streamId, consumed)) },
       onStreamClose: (streamId) => { streams.get(streamId)?.socket.destroy(); streams.delete(streamId) },

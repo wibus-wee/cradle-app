@@ -1,16 +1,14 @@
 import net from 'node:net'
 
-import WebSocket from 'ws'
-
 import { AppError } from '../../errors/app-error'
 import type { LocalTunnelHandle } from '../../runtime/local-tunnel'
 import { allocateLocalPort } from '../../runtime/local-tunnel'
 import { fabricHeadersRecord } from '../fabric/protocol'
+import type { EnvelopePipe } from './envelope-pipe'
 import type { FabricEnvelopeRoute } from './fabric-envelope'
 import { decodeFabricEnvelope, encodeFabricEnvelope, toFabricSessionEnvelope } from './fabric-envelope'
 import { FabricSession } from './session'
-import { closeRelayWebSocket } from './websocket'
-import { relayWebSocketDataView } from './websocket-data'
+import { WebSocketEnvelopePipe } from './websocket-envelope-pipe'
 
 /**
  * Controller-side Fabric link transport.
@@ -105,7 +103,8 @@ class ControllerTransport {
   >()
 
   private session: FabricSession | null = null
-  private ws: WebSocket | null = null
+  private pipe: EnvelopePipe | null = null
+  private handshakeReady = false
   private server: net.Server | null = null
   private streamCounter = 0
   private closed = false
@@ -181,17 +180,53 @@ class ControllerTransport {
         }
       }
 
-      let ws: WebSocket
+      let pipe: EnvelopePipe
+      let session: FabricSession
       try {
-        ws = new WebSocket(wsUrl, { headers: fabricHeadersRecord(this.options.fabric.headers) })
+        pipe = new WebSocketEnvelopePipe(wsUrl, fabricHeadersRecord(this.options.fabric.headers), {
+          onOpen: () => {
+            checkpoint.websocketOpenedAt = Date.now()
+            session.start()
+          },
+          onMessage: (raw) => {
+            try {
+              const envelope = decodeFabricEnvelope(raw)
+              if (envelope.fabricId !== this.options.fabric.fabricId || envelope.nodeId !== this.options.fabric.nodeId || envelope.linkId !== this.options.fabric.linkId) { throw new AppError({ code: 'fabric_protocol_route_mismatch', status: 400, message: 'Fabric relay route mismatch.' }) }
+              session.handleEnvelope(toFabricSessionEnvelope(envelope))
+            }
+ catch (error) {
+              finish(error instanceof Error ? error : new Error(String(error)))
+            }
+          },
+          onClose: () => {
+            if (this.handshakeReady) {
+              this.fireExit(null, null)
+              return
+            }
+            finish(
+              new AppError({
+                code: 'relay_controller_ws_closed',
+                status: 503,
+                message: 'Relayd closed the controller websocket before the handshake completed.',
+              }),
+            )
+          },
+          onError: (error) => {
+            if (this.handshakeReady) {
+              this.fireExit(null, null)
+              return
+            }
+            finish(error)
+          },
+        })
       }
  catch (error) {
         finish(error instanceof Error ? error : new Error(String(error)))
         return
       }
-      this.ws = ws
+      this.pipe = pipe
 
-      const session = new FabricSession(
+      session = new FabricSession(
         'controller',
         this.keypair.privateKeyBase64,
         {
@@ -203,18 +238,13 @@ class ControllerTransport {
         },
         {
           send: (data) => {
-            if (ws.readyState === WebSocket.OPEN) {
-              ws.send(data)
-            }
+            pipe.send(data)
           },
           onReady: () => {
             checkpoint.handshakeReadyAt = Date.now()
-            // Swap the handshake close handler for a post-ready one: a drop
-            // after ready is a tunnel exit, not a handshake failure.
-            ws.removeAllListeners('close')
-            ws.removeAllListeners('error')
-            ws.on('close', () => this.fireExit(null, null))
-            ws.on('error', () => this.fireExit(null, null))
+            // A drop after ready is a tunnel exit, not a handshake failure;
+            // the shared pipe close/error handlers branch on this flag.
+            this.handshakeReady = true
             finish()
           },
           onPeerPubkey: (pubkey) => {
@@ -229,31 +259,6 @@ class ControllerTransport {
         },
       )
       this.session = session
-
-      ws.once('open', () => {
-        checkpoint.websocketOpenedAt = Date.now()
-        session.start()
-      })
-      ws.on('message', (data: WebSocket.RawData) => {
-        try {
-          const raw = relayWebSocketDataView(data)
-          const envelope = decodeFabricEnvelope(raw)
-          if (envelope.fabricId !== this.options.fabric.fabricId || envelope.nodeId !== this.options.fabric.nodeId || envelope.linkId !== this.options.fabric.linkId) { throw new AppError({ code: 'fabric_protocol_route_mismatch', status: 400, message: 'Fabric relay route mismatch.' }) }
-          session.handleEnvelope(toFabricSessionEnvelope(envelope))
-        }
- catch (error) {
-          finish(error instanceof Error ? error : new Error(String(error)))
-        }
-      })
-      ws.once('close', () =>
-        finish(
-          new AppError({
-            code: 'relay_controller_ws_closed',
-            status: 503,
-            message: 'Relayd closed the controller websocket before the handshake completed.',
-          }),
-        ))
-      ws.once('error', error => finish(error))
     })
   }
 
@@ -367,10 +372,11 @@ class ControllerTransport {
   private async teardown(): Promise<void> {
     this.session?.close()
     this.session = null
-    if (this.ws) {
-      closeRelayWebSocket(this.ws)
-      this.ws = null
+    if (this.pipe) {
+      this.pipe.teardown()
+      this.pipe = null
     }
+    this.handshakeReady = false
     for (const { socket } of this.streams.values()) {
       socket.destroy()
     }
