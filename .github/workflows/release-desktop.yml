@@ -325,6 +325,16 @@ jobs:
             exit 1
           fi
 
+          # SUPublicEDKey is baked into Info.plist by electron-builder.mjs from the
+          # SPARKLE_ED_PUBLIC_KEY env. A missing key or an unreplaced placeholder
+          # would let Sparkle initialize with an unusable verifier and reject every
+          # signed update, so fail the build rather than ship it.
+          ed_key="$(plutil -extract SUPublicEDKey raw -o - "$info_plist" 2>/dev/null || true)"
+          if [ -z "$ed_key" ] || [ "$ed_key" = "SPARKLE_ED_PUBLIC_KEY_PLACEHOLDER" ]; then
+            echo "SUPublicEDKey missing or still the placeholder in $info_plist" >&2
+            exit 1
+          fi
+
           echo "Sparkle comparison version: $bundle_version"
           echo "Sparkle display version: $display_version"
 
@@ -410,47 +420,107 @@ jobs:
           cp "release/${zip_name}" "$archive_dir/"
           ls -la "$archive_dir"
 
-      - name: Remove legacy Sparkle aliases from delta bases
+      - name: Fetch Sparkle delta bases and appcast history
+        working-directory: apps/desktop
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
+          SPARKLE_TAG: ${{ needs.resolve.outputs.release_tag }}
           SPARKLE_TAG_PREFIX: ${{ needs.resolve.outputs.sparkle_tag_prefix }}
         shell: bash
         run: |
           set -euo pipefail
+          # We cannot use the upstream composite Action here: it excludes
+          # prereleases (but dev/bleeding-edge feeds are all prereleases) and its
+          # archive-suffix derivation degenerates to ".zip" on release-channel
+          # zips, failing on every release that also ships the Windows zip.
+          # fetch-sparkle-delta-bases.py performs the equivalent selection
+          # channel-aware; for bleeding-edge the only matching tag is the rolling
+          # feed itself, so bases come straight from the previous feed contents.
+          python3 scripts/fetch-sparkle-delta-bases.py \
+            --repo "$GH_REPO" \
+            --tag "$SPARKLE_TAG" \
+            --tag-prefix "$SPARKLE_TAG_PREFIX" \
+            --archive-dir "release/sparkle-archive" \
+            --bases 2 --history 6
 
-          # Older releases contain both the canonical versioned archive and the
-          # old Cradle-mac-arm64.zip alias. The Sparkle action downloads every
-          # *.zip from its delta-base releases, so remove the duplicate before it
-          # scans the directory. This is a one-time migration for existing feeds;
-          # new releases no longer publish the alias.
-          previous_tags="$(gh release list --repo "$GH_REPO" --exclude-drafts --limit 20 --json tagName \
-            -q "[.[] | select(.tagName | startswith(\"$SPARKLE_TAG_PREFIX\"))][0:2][].tagName" 2>/dev/null || true)"
-          while IFS= read -r tag; do
-            [ -n "$tag" ] || continue
-            if gh release view "$tag" --repo "$GH_REPO" --json assets \
-              --jq '.assets[].name' | /usr/bin/grep -Fxq 'Cradle-mac-arm64.zip'; then
-              echo "Removing legacy Sparkle alias from $tag"
-              gh release delete-asset "$tag" Cradle-mac-arm64.zip --repo "$GH_REPO" --yes
-            fi
-          done <<< "$previous_tags"
+      - name: Generate Sparkle appcast + deltas (vendored tools)
+        working-directory: apps/desktop
+        env:
+          SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
+          DOWNLOAD_URL_PREFIX: ${{ needs.resolve.outputs.release_download_url }}/
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive_dir="release/sparkle-archive"
+          sparkle_bin="node_modules/electron-sparkle-updater/native/vendor/bin"
+          history_script="node_modules/electron-sparkle-updater/native/scripts/appcast-history.py"
 
-      - name: Generate Sparkle appcast + deltas
-        uses: Innei/electron-sparkle-updater/action@v1
-        with:
-          tag: ${{ needs.resolve.outputs.channel == 'bleeding-edge' && needs.resolve.outputs.bleeding_edge_feed_tag || needs.resolve.outputs.release_tag }}
-          archive-dir: ${{ github.workspace }}/apps/desktop/release/sparkle-archive
-          ed-private-key: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
-          repo: ${{ github.repository }}
-          tag-prefix: ${{ needs.resolve.outputs.sparkle_tag_prefix }}
-          download-url-prefix: ${{ needs.resolve.outputs.release_download_url }}/
-          # Pull last 2 matching channel releases as delta bases. First-ever channel
-          # release simply yields a full-only appcast (no bases found).
-          fetch-delta-bases: 'true'
-          delta-bases: '2'
-          # Keep Cradle's multi-platform publish job as the single release publisher.
-          publish: 'false'
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          # The tools ship inside the npm package (pinned Sparkle 2.9.4 tarball,
+          # checksum-verified by the library's own fetch script) — same binaries
+          # the composite Action downloads, but pinned to the runtime framework
+          # version the app actually embeds.
+          if [ ! -f "$sparkle_bin/generate_appcast" ]; then
+            echo "vendored Sparkle tools missing; run pnpm rebuild:sparkle first" >&2
+            exit 1
+          fi
+          chmod +x "$sparkle_bin"/* 2>/dev/null || true
+
+          # The archive dir can now hold up to 3 zips (this release + delta bases),
+          # so ls-order cannot identify our own. CFBundleVersion is the run number
+          # the verify step already confirmed in the packaged .app — same value
+          # generate_appcast reads out of the zip itself.
+          own_version="$(plutil -extract CFBundleVersion raw -o - release/mac-arm64/Cradle.app/Contents/Info.plist)"
+
+          # generate_appcast only generates *.delta against versions it finds in an
+          # EXISTING appcast.xml in the archive dir. Seed it with the newest history
+          # snapshot the prefetch downloaded; the merge step afterwards re-appends
+          # the remaining bounded history items.
+          newest_history="$(find "$archive_dir/history" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | sort | head -1 || true)"
+          if [ -n "$newest_history" ] && [ -f "$newest_history/appcast.xml" ]; then
+            cp "$newest_history/appcast.xml" "$archive_dir/appcast.xml"
+            echo "Seeded appcast.xml from $newest_history for delta generation"
+          fi
+
+          DEV="$(hdiutil attach -nomount ram://16384 | awk '{print $1}')"
+          diskutil erasevolume HFS+ SparkleKeyRAM "$DEV" >/dev/null
+          KEY_DIR="/Volumes/SparkleKeyRAM"
+          KEY_FILE="$KEY_DIR/ed_private_key"
+          printf '%s' "$SPARKLE_ED_PRIVATE_KEY" > "$KEY_FILE"
+
+          cleanup() {
+            dd if=/dev/urandom of="$KEY_FILE" bs=1024 count=4 conv=notrunc 2>/dev/null || true
+            rm -f "$KEY_FILE" || true
+            hdiutil detach "$DEV" || true
+          }
+          trap cleanup EXIT
+
+          "$sparkle_bin/generate_appcast" \
+            --versions "$own_version" \
+            --maximum-versions 1 \
+            --maximum-deltas 2 \
+            --ed-key-file "$KEY_FILE" \
+            --download-url-prefix "$DOWNLOAD_URL_PREFIX" \
+            --embed-release-notes \
+            --full-release-notes-url "https://github.com/${GH_REPO}/releases" \
+            "$archive_dir"
+
+          # Bounded multi-hop delta chains: merge the current item with the
+          # newest-first history snapshots prefetched above. Historical enclosure
+          # URLs are preserved verbatim, so dev items keep pointing at their
+          # versioned dev-* releases and bleeding-edge items at the rolling feed.
+          python3 "$history_script" merge "$archive_dir/appcast.xml" \
+            --history-dir "$archive_dir/history" --history 6
+
+          # --maximum-versions 1 moves the base zips into old_updates/ while
+          # pruning; their only purpose was delta generation and they must not
+          # linger (they are not re-uploaded either way), so drop them explicitly.
+          rm -rf "$archive_dir/old_updates"
+
+          "$sparkle_bin/sign_update" --ed-key-file "$KEY_FILE" "$archive_dir/appcast.xml"
+
+          /usr/bin/grep -c '<item>' "$archive_dir/appcast.xml" | xargs echo "appcast items:"
 
       - name: Collect Sparkle appcast assets
         working-directory: apps/desktop
@@ -459,7 +529,7 @@ jobs:
           set -euo pipefail
           archive_dir="release/sparkle-archive"
           if [ ! -f "$archive_dir/appcast.xml" ]; then
-            echo "official Sparkle action did not produce appcast.xml" >&2
+            echo "appcast generation step did not produce appcast.xml" >&2
             exit 1
           fi
 
@@ -949,19 +1019,19 @@ jobs:
           fs.writeFileSync('release-body.md', releaseBody, 'utf8')
           NODE
 
-          if [ "$RELEASE_CHANNEL" = "dev" ] || [ "$RELEASE_CHANNEL" = "bleeding-edge" ]; then
+          # Dev feeds only carry the feed metadata: appcast enclosure URLs and the
+          # URLs inside latest*.yml all point at the versioned dev-* release, so
+          # copying zips/deltas onto the rolling feed would be dead weight.
+          # bleeding-edge has no versioned release at all, so its feed IS the
+          # distribution point and keeps everything (release-assets is uploaded
+          # wholesale below instead of through feed-assets).
+          if [ "$RELEASE_CHANNEL" = "dev" ]; then
             mkdir -p feed-assets
-            if [ -f release-assets/appcast.xml ]; then
-              cp release-assets/appcast.xml feed-assets/
-            fi
-            if [ -f release-assets/latest.yml ]; then
-              cp release-assets/latest.yml feed-assets/
-            fi
-            if [ -f release-assets/latest-linux.yml ]; then
-              cp release-assets/latest-linux.yml feed-assets/
-            fi
-            # Versioned mac zips for the feed channel.
-            find release-assets -maxdepth 1 -type f \( -name 'Cradle-*-mac-*.zip' -o -name '*.delta' \) -exec cp {} feed-assets/ \;
+            for small in appcast.xml latest.yml latest-linux.yml; do
+              if [ -f "release-assets/$small" ]; then
+                cp "release-assets/$small" feed-assets/
+              fi
+            done
             find feed-assets -maxdepth 1 -type f -print | sort
           fi
 
@@ -981,72 +1051,79 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Clear dev feed release assets
-        if: needs.resolve.outputs.channel == 'dev'
+      - name: Update rolling feed release (dev / bleeding-edge)
+        if: needs.resolve.outputs.channel == 'dev' || needs.resolve.outputs.channel == 'bleeding-edge'
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
-          DEV_FEED_TAG: ${{ needs.resolve.outputs.dev_feed_tag }}
+          RELEASE_CHANNEL: ${{ needs.resolve.outputs.channel }}
+          FEED_TAG: ${{ needs.resolve.outputs.channel == 'dev' && needs.resolve.outputs.dev_feed_tag || needs.resolve.outputs.bleeding_edge_feed_tag }}
+          RELEASE_TAG: ${{ needs.resolve.outputs.release_tag }}
+          GITHUB_SHA: ${{ github.sha }}
         shell: bash
         run: |
           set -euo pipefail
-          release_id="$(gh api "repos/${GH_REPO}/releases/tags/${DEV_FEED_TAG}" --jq '.id' 2>/dev/null || true)"
-          if [ -z "$release_id" ]; then
-            exit 0
+
+          # Dev feeds carry only feed metadata; bleeding-edge carries the full
+          # distribution because it has no versioned release.
+          if [ "$RELEASE_CHANNEL" = "dev" ]; then
+            asset_dir="feed-assets"
+            feed_title="Feed dev"
+            feed_body="Rolling desktop dev update feed for ${RELEASE_TAG}."
+          else
+            asset_dir="release-assets"
+            feed_title="Feed bleeding edge"
+            feed_body="Rolling desktop bleeding-edge update feed (commit ${GITHUB_SHA})."
           fi
 
-          gh api --paginate "repos/${GH_REPO}/releases/${release_id}/assets" --jq '.[].id' | while read -r asset_id; do
-            if [ -n "$asset_id" ]; then
-              gh api --method DELETE "repos/${GH_REPO}/releases/assets/${asset_id}"
-            fi
-          done
-
-      - name: Update dev feed release
-        if: needs.resolve.outputs.channel == 'dev'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ needs.resolve.outputs.dev_feed_tag }}
-          target_commitish: ${{ github.sha }}
-          name: Feed dev
-          body: 'Rolling desktop dev update feed for ${{ needs.resolve.outputs.release_tag }}.'
-          prerelease: true
-          make_latest: false
-          files: |
-            feed-assets/*
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Clear bleeding-edge feed release assets
-        if: needs.resolve.outputs.channel == 'bleeding-edge'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_REPO: ${{ github.repository }}
-          BLEEDING_EDGE_FEED_TAG: ${{ needs.resolve.outputs.bleeding_edge_feed_tag }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          release_id="$(gh api "repos/${GH_REPO}/releases/tags/${BLEEDING_EDGE_FEED_TAG}" --jq '.id' 2>/dev/null || true)"
-          if [ -z "$release_id" ]; then
-            exit 0
+          if ! gh release view "$FEED_TAG" --repo "$GH_REPO" >/dev/null 2>&1; then
+            gh release create "$FEED_TAG" --repo "$GH_REPO" \
+              --title "$feed_title" --notes "$feed_body" --prerelease --target "$GITHUB_SHA"
           fi
 
-          gh api --paginate "repos/${GH_REPO}/releases/${release_id}/assets" --jq '.[].id' | while read -r asset_id; do
-            if [ -n "$asset_id" ]; then
-              gh api --method DELETE "repos/${GH_REPO}/releases/assets/${asset_id}"
-            fi
+          # Ordering contract: the previous implementation deleted every asset
+          # before re-uploading, so users hitting the feed mid-publish could get a
+          # truncated appcast, missing zips, or broken delta chains — permanently
+          # for any build they skipped. Instead we overwrite in place and upload
+          # the appcast LAST, so the feed only advertises assets that already
+          # exist; stale-asset deletion runs after that.
+          shopt -s nullglob
+          big_assets=()
+          small_assets=()
+          appcast=""
+          for file in "$asset_dir"/*; do
+            base="$(basename "$file")"
+            case "$base" in
+              appcast.xml) appcast="$file" ;;
+              latest.yml|latest-linux.yml) small_assets+=("$file") ;;
+              *) big_assets+=("$file") ;;
+            esac
           done
+          if [ ${#big_assets[@]} -gt 0 ]; then
+            gh release upload "$FEED_TAG" --repo "$GH_REPO" --clobber "${big_assets[@]}"
+          fi
+          if [ ${#small_assets[@]} -gt 0 ]; then
+            gh release upload "$FEED_TAG" --repo "$GH_REPO" --clobber "${small_assets[@]}"
+          fi
+          if [ -n "$appcast" ]; then
+            gh release upload "$FEED_TAG" --repo "$GH_REPO" --clobber "$appcast"
+          fi
 
-      - name: Update bleeding-edge feed release
-        if: needs.resolve.outputs.channel == 'bleeding-edge'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ needs.resolve.outputs.bleeding_edge_feed_tag }}
-          target_commitish: ${{ github.sha }}
-          name: Feed bleeding edge
-          body: 'Rolling desktop bleeding-edge update feed (commit ${{ github.sha }}).'
-          prerelease: true
-          make_latest: false
-          files: |
-            release-assets/*
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Keep-set: everything we just uploaded, plus every .delta the new
+          # appcast still references — those are historical chain edges clients a
+          # few builds behind download through. Anything older (superseded full
+          # zips, deltas that fell out of the bounded history window) is deleted.
+          keep_file="$(mktemp)"
+          for file in "$asset_dir"/*; do basename "$file"; done > "$keep_file"
+          if [ -n "$appcast" ]; then
+            /usr/bin/grep -o '[^"/]*[.]delta' "$appcast" | sort -u >> "$keep_file" || true
+          fi
+
+          gh api "repos/${GH_REPO}/releases/tags/${FEED_TAG}" --jq '.assets[] | "\(.id)\t\(.name)"' 2>/dev/null \
+            | while IFS=$'\t' read -r asset_id asset_name; do
+                if ! /usr/bin/grep -Fxq "$asset_name" "$keep_file"; then
+                  echo "Deleting stale feed asset: $asset_name"
+                  gh api --method DELETE "repos/${GH_REPO}/releases/assets/${asset_id}"
+                fi
+              done
+          rm -f "$keep_file"

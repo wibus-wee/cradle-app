@@ -1,4 +1,4 @@
-import type { SparkleBridge } from 'electron-sparkle-updater'
+import type { SparkleBridge, SparkleBridgeEvent } from 'electron-sparkle-updater'
 import { loadSparkleBridgeForApp } from 'electron-sparkle-updater'
 
 import {
@@ -6,6 +6,8 @@ import {
   readSparklePublicEdKey,
   readUpdateFeedUrl,
 } from './update-feed'
+
+export type { SparkleBridgeEvent }
 
 export type MacOSSparkleUpdateAdapterOptions = {
   updateFeedUrl?: string | null
@@ -23,14 +25,20 @@ export type MacOSSparkleInitResult = {
 /**
  * macOS update transport owned by Sparkle via electron-sparkle-updater.
  *
- * Sparkle owns discovery, download, install, relaunch, and update UI once the
- * native bridge is initialized. Cradle only configures and invokes the bridge.
+ * Since electron-sparkle-updater 0.3, Sparkle's user driver is silent: there is
+ * no native update UI, and every update found is downloaded automatically.
+ * The bridge reports the lifecycle through `setEventHandler`; Cradle forwards
+ * those events to the single `onEvent` consumer (DesktopUpdateManager), which
+ * owns their mapping onto the renderer-visible update status. Installation is
+ * explicit: `installUpdateNow()` installs and relaunches, `installUpdateOnQuit()`
+ * stages the downloaded update for the app's own termination.
  */
 export class MacOSSparkleUpdateAdapter {
   private readonly appcastUrl: string | null
   private readonly publicEdKey: string | null
   private readonly loadBridge: typeof loadSparkleBridgeForApp
   private readonly log: (message: string) => void
+  private eventHandler: ((event: SparkleBridgeEvent) => void) | null = null
   private bridge: SparkleBridge | null = null
   private initialized = false
   private initError: string | null = null
@@ -92,7 +100,20 @@ export class MacOSSparkleUpdateAdapter {
 
     this.bridge = bridge
     this.initError = null
+    if (this.eventHandler) {
+      bridge.setEventHandler(this.eventHandler)
+    }
     return { ready: true, errorMessage: null }
+  }
+
+  /**
+   * Routes Sparkle lifecycle events to the consumer. Pass null before process
+   * teardown so the N-API thread-safe function is not invoked after the JS
+   * handler is gone.
+   */
+  setEventHandler(handler: ((event: SparkleBridgeEvent) => void) | null): void {
+    this.eventHandler = handler
+    this.bridge?.setEventHandler(handler)
   }
 
   setAutomaticChecks(enabled: boolean): void {
@@ -100,12 +121,47 @@ export class MacOSSparkleUpdateAdapter {
   }
 
   /**
-   * Opens Sparkle's native update UI. Sparkle owns discovery + download from here.
+   * Starts a silent update check. Results arrive as events; nothing is shown
+   * natively. When a check is already in progress Sparkle queues it and runs it
+   * once the current cycle finishes.
    */
-  checkForUpdatesWithUI(): void {
+  checkForUpdates(): void {
+    this.assertReady()
+    this.bridge!.checkForUpdates()
+  }
+
+  /**
+   * Installs an already-downloaded update immediately; Sparkle terminates and
+   * relaunches the app. If no update is staged yet, the next ready update
+   * installs without a second prompt.
+   */
+  installUpdateNow(): void {
+    this.assertReady()
+    this.bridge!.installUpdateNow()
+  }
+
+  /**
+   * Stages the downloaded update so Sparkle installs it when the app terminates
+   * on its own. If nothing is staged yet, the next downloaded update is staged
+   * the same way.
+   */
+  installUpdateOnQuit(): void {
+    this.assertReady()
+    this.bridge!.installUpdateOnQuit()
+  }
+
+  /**
+   * Drops a downloaded or staged update so the next check re-reads the appcast
+   * instead of resuming the old download.
+   */
+  discardDownloadedUpdate(): void {
+    this.assertReady()
+    this.bridge!.discardDownloadedUpdate()
+  }
+
+  private assertReady(): void {
     if (!this.bridge) {
       throw new Error(this.initError ?? 'Sparkle bridge is not ready')
     }
-    this.bridge.checkForUpdates()
   }
 }

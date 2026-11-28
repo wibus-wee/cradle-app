@@ -19,6 +19,7 @@ const availableStatus = {
     releaseDate: '2026-07-24',
     files: [],
   },
+  downloadProgress: null,
   errorMessage: null,
 } satisfies DesktopUpdateStatus
 

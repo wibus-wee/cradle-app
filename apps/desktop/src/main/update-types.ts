@@ -14,6 +14,19 @@ export type DesktopUpdateInfo = {
   files: DesktopUpdateFile[]
 }
 
+export type DesktopUpdateDownloadProgress = {
+  /**
+   * Sparkle-owned transfer state. `download` counts bytes across the whole
+   * delta chain; `apply` reports patch application/extraction. A fallback to
+   * the full archive restarts the range (`fallback` is true on its first event).
+   */
+  phase: 'download' | 'apply'
+  percent: number | null
+  transferred: number | null
+  total: number | null
+  fallback: boolean
+}
+
 export type DesktopUpdateStatus = {
   unsupported: boolean
   /** Transport owner for the current platform, when updates are supported. */
@@ -23,6 +36,12 @@ export type DesktopUpdateStatus = {
   isPreparingUpdate: boolean
   updateDownloaded: boolean
   updateInfo: DesktopUpdateInfo | null
+  /**
+   * Live download/apply progress for transports that own the download
+   * themselves (Sparkle). Windows/Linux electron-updater downloads stream
+   * through Download Center tasks instead, so this stays null there.
+   */
+  downloadProgress: DesktopUpdateDownloadProgress | null
   errorMessage: string | null
 }
 

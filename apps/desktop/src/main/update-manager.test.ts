@@ -8,22 +8,47 @@ const electronMocks = vi.hoisted(() => ({
 }))
 
 const sparkleMocks = vi.hoisted(() => {
+  type SparkleEventHandler = (event: Record<string, unknown>) => void
+
   const state = {
     ready: true,
     initError: null as string | null,
+    eventHandler: null as SparkleEventHandler | null,
     instances: [] as Array<{
       initialize: ReturnType<typeof vi.fn>
       setAutomaticChecks: ReturnType<typeof vi.fn>
-      checkForUpdatesWithUI: ReturnType<typeof vi.fn>
+      checkForUpdates: ReturnType<typeof vi.fn>
+      installUpdateNow: ReturnType<typeof vi.fn>
+      installUpdateOnQuit: ReturnType<typeof vi.fn>
+      discardDownloadedUpdate: ReturnType<typeof vi.fn>
+      setEventHandler: ReturnType<typeof vi.fn>
       isReady: boolean
       lastInitError: string | null
     }>,
   }
 
   class MacOSSparkleUpdateAdapter {
-    initialize = vi.fn(async () => ({ ready: state.ready, errorMessage: state.initError }))
+    initialize = vi.fn(async () => {
+      if (state.ready && state.eventHandler) {
+        this.bridge?.setEventHandler?.(state.eventHandler)
+      }
+      return { ready: state.ready, errorMessage: state.initError }
+    })
+
     setAutomaticChecks = vi.fn()
-    checkForUpdatesWithUI = vi.fn()
+    checkForUpdates = vi.fn()
+    installUpdateNow = vi.fn()
+    installUpdateOnQuit = vi.fn()
+    discardDownloadedUpdate = vi.fn()
+    setEventHandler = vi.fn((handler: SparkleEventHandler | null) => {
+      state.eventHandler = handler
+    })
+
+    bridge = {
+      setEventHandler: (handler: SparkleEventHandler | null) => {
+        state.eventHandler = handler
+      },
+    } as { setEventHandler: (handler: SparkleEventHandler | null) => void } | null
 
     get isReady() {
       return state.ready
@@ -120,6 +145,7 @@ describe('desktopUpdateManager', () => {
     electronMocks.app.isPackaged = true
     sparkleMocks.state.ready = true
     sparkleMocks.state.initError = null
+    sparkleMocks.state.eventHandler = null
     sparkleMocks.state.instances = []
     electronUpdaterMocks.autoUpdater.reset()
     Object.defineProperty(process, 'platform', { value: 'darwin' })
@@ -136,24 +162,98 @@ describe('desktopUpdateManager', () => {
     delete process.env.SPARKLE_ED_PUBLIC_KEY
   })
 
-  it('checks for macOS Sparkle updates and opens the native UI', async () => {
+  it('checks for macOS Sparkle updates silently and maps bridge events into status', async () => {
     const { DesktopUpdateManager } = await import('./update-manager')
     const manager = new DesktopUpdateManager({
       updateFeedUrl: 'https://updates.example.com/cradle/appcast.xml',
     })
 
-    await expect(manager.checkForUpdates()).resolves.toMatchObject({
-      provider: 'sparkle',
-      updateInfo: null,
-      updateDownloaded: false,
-      isCheckingForUpdates: false,
+    await manager.checkForUpdates()
+    const adapter = sparkleMocks.state.instances[0]
+    expect(adapter.checkForUpdates).toHaveBeenCalledTimes(1)
+    expect(manager.status.isCheckingForUpdates).toBe(true)
+
+    // The silent driver reports the found update and downloads it automatically.
+    sparkleMocks.state.eventHandler!({
+      type: 'update-available',
+      version: '2.0.0',
+      releaseName: 'Cradle 2.0.0',
+      releaseNotes: 'notes',
+      releaseDate: '2026-07-19T00:00:00.000Z',
+    })
+    expect(manager.status.isCheckingForUpdates).toBe(false)
+    expect(manager.status.updateInfo).toMatchObject({
+      version: '2.0.0',
+      releaseName: 'Cradle 2.0.0',
+      files: [],
+    })
+    expect(manager.status.updateDownloaded).toBe(false)
+
+    sparkleMocks.state.eventHandler!({
+      type: 'download-progress',
+      phase: 'download',
+      percent: 42,
+      transferred: 4200,
+      total: 10000,
+    })
+    expect(manager.status.downloadProgress).toMatchObject({
+      phase: 'download',
+      percent: 42,
+      transferred: 4200,
+      total: 10000,
+      fallback: false,
     })
 
-    const adapter = sparkleMocks.state.instances[0]
-    expect(adapter.checkForUpdatesWithUI).toHaveBeenCalled()
+    sparkleMocks.state.eventHandler!({
+      type: 'download-progress',
+      phase: 'apply',
+      percent: 60,
+    })
+    expect(manager.status.downloadProgress).toMatchObject({ phase: 'apply', percent: 60 })
+    expect(manager.status.isPreparingUpdate).toBe(true)
+
+    sparkleMocks.state.eventHandler!({ type: 'update-downloaded', version: '2.0.0' })
+    expect(manager.status.updateDownloaded).toBe(true)
+    expect(manager.status.downloadProgress).toBeNull()
+    expect(manager.status.isPreparingUpdate).toBe(false)
   })
 
-  it('does not mirror Sparkle installation into the desktop update facade', async () => {
+  it('clears Sparkle update state when no update is available', async () => {
+    const { DesktopUpdateManager } = await import('./update-manager')
+    const manager = new DesktopUpdateManager({
+      updateFeedUrl: 'https://updates.example.com/cradle/appcast.xml',
+    })
+
+    await manager.checkForUpdates()
+    sparkleMocks.state.eventHandler!({ type: 'update-not-available' })
+
+    expect(manager.status.isCheckingForUpdates).toBe(false)
+    expect(manager.status.updateInfo).toBeNull()
+    expect(manager.status.updateDownloaded).toBe(false)
+    expect(manager.status.downloadProgress).toBeNull()
+  })
+
+  it('surfaces Sparkle errors and keeps the failed download retryable', async () => {
+    const { DesktopUpdateManager } = await import('./update-manager')
+    const manager = new DesktopUpdateManager({
+      updateFeedUrl: 'https://updates.example.com/cradle/appcast.xml',
+    })
+
+    await manager.checkForUpdates()
+    sparkleMocks.state.eventHandler!({ type: 'update-available', version: '2.0.0' })
+    sparkleMocks.state.eventHandler!({ type: 'error', message: 'signature mismatch' })
+
+    expect(manager.status.errorMessage).toBe('signature mismatch')
+    expect(manager.status.isCheckingForUpdates).toBe(false)
+    expect(manager.status.downloadProgress).toBeNull()
+    expect(manager.status.updateInfo).toMatchObject({ version: '2.0.0' })
+
+    // Retrying the download re-runs discovery so Sparkle re-reads the appcast.
+    await manager.downloadUpdate()
+    expect(sparkleMocks.state.instances[0].checkForUpdates).toHaveBeenCalledTimes(2)
+  })
+
+  it('installs a downloaded Sparkle update through installUpdateNow after the quit hook', async () => {
     const prepareQuitForUpdate = vi.fn(async () => undefined)
     const { DesktopUpdateManager } = await import('./update-manager')
     const manager = new DesktopUpdateManager({
@@ -161,22 +261,65 @@ describe('desktopUpdateManager', () => {
       prepareQuitForUpdate,
     })
 
-    await manager.checkForUpdates({ quiet: true })
+    await manager.checkForUpdates()
+    sparkleMocks.state.eventHandler!({ type: 'update-available', version: '2.0.0' })
+    sparkleMocks.state.eventHandler!({ type: 'update-downloaded', version: '2.0.0' })
+
+    await manager.applyUpdate()
+
+    expect(prepareQuitForUpdate).toHaveBeenCalled()
+    expect(sparkleMocks.state.instances[0].installUpdateNow).toHaveBeenCalledTimes(1)
+    expect(manager.status.errorMessage).toBeNull()
+  })
+
+  it('refuses to install a Sparkle update before it finished downloading', async () => {
+    const prepareQuitForUpdate = vi.fn(async () => undefined)
+    const { DesktopUpdateManager } = await import('./update-manager')
+    const manager = new DesktopUpdateManager({
+      updateFeedUrl: 'https://updates.example.com/cradle/appcast.xml',
+      prepareQuitForUpdate,
+    })
+
+    // Wait for async Sparkle initialization, which clears the initial error message.
+    await vi.waitFor(() => {
+      expect(sparkleMocks.state.instances[0].setEventHandler).toHaveBeenCalled()
+    })
+
     await manager.applyUpdate()
 
     expect(prepareQuitForUpdate).not.toHaveBeenCalled()
-    expect(manager.status.errorMessage).toContain('Sparkle manages installation')
+    expect(sparkleMocks.state.instances[0].installUpdateNow).not.toHaveBeenCalled()
+    expect(manager.status.errorMessage).toBe('No prepared desktop update is available')
   })
 
-  it('does not open Sparkle UI during quiet background checks', async () => {
+  it('stages a downloaded Sparkle update for install on quit', async () => {
     const { DesktopUpdateManager } = await import('./update-manager')
     const manager = new DesktopUpdateManager({
       updateFeedUrl: 'https://updates.example.com/cradle/appcast.xml',
     })
 
-    await manager.checkForUpdates({ quiet: true })
-    expect(sparkleMocks.state.instances[0].checkForUpdatesWithUI).not.toHaveBeenCalled()
-    expect(manager.status.updateInfo).toBeNull()
+    // Nothing downloaded yet: no staging.
+    manager.installSparkleUpdateOnQuit()
+    expect(sparkleMocks.state.instances[0].installUpdateOnQuit).not.toHaveBeenCalled()
+
+    await manager.checkForUpdates()
+    sparkleMocks.state.eventHandler!({ type: 'update-downloaded', version: '2.0.0' })
+    manager.installSparkleUpdateOnQuit()
+    expect(sparkleMocks.state.instances[0].installUpdateOnQuit).toHaveBeenCalledTimes(1)
+  })
+
+  it('releases the Sparkle event handler on shutdown', async () => {
+    const { DesktopUpdateManager } = await import('./update-manager')
+    const manager = new DesktopUpdateManager({
+      updateFeedUrl: 'https://updates.example.com/cradle/appcast.xml',
+    })
+
+    await vi.waitFor(() => {
+      expect(sparkleMocks.state.instances[0].setEventHandler).toHaveBeenCalled()
+    })
+    await manager.shutdown()
+
+    expect(sparkleMocks.state.instances[0].setEventHandler).toHaveBeenLastCalledWith(null)
   })
 
   it('marks Sparkle as unsupported when the bridge fails to initialize', async () => {

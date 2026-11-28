@@ -64,21 +64,29 @@ function loadSparkleBuilderFragments() {
     })
   }
   catch (error) {
-    console.warn(`[desktop] electron-sparkle-updater/builder unavailable: ${error instanceof Error ? error.message : String(error)}`)
+    // sparkleLocalizations() reads the vendored framework's .lproj folders, which
+    // only exist after `rebuild` extracted them — and rebuild is a deliberate
+    // no-op off darwin. Windows/Linux packaging therefore legitimately resolves
+    // no Sparkle fragment; on macOS a failure here means the packaged app would
+    // silently ship without Sparkle.framework, so fail the build instead.
+    if (process.platform === 'darwin') {
+      throw new Error(
+        `[desktop] electron-sparkle-updater/builder unavailable on darwin: ${error instanceof Error ? error.message : String(error)} — run pnpm rebuild:sparkle first`,
+      )
+    }
+    console.warn(`[desktop] electron-sparkle-updater/builder unavailable (${error instanceof Error ? error.message : String(error)}); packaging without Sparkle is fine off darwin`)
     return {
       extraFiles: [],
-      files: [],
+      // Vendor exclusions stay even in the fallback: the tarball copy of the
+      // framework must never land in the asar regardless of platform.
+      files: [
+        '!**/node_modules/electron-sparkle-updater/native/vendor/**',
+        '!**/node_modules/electron-sparkle-updater/native/sparkle-chain.tar.xz',
+      ],
       asarUnpack: [],
       dmg: { writeUpdateInfo: false },
       zip: { writeUpdateInfo: false },
-      mac: {
-        extendInfo: {
-          SUFeedURL: sparkleAppcastUrl,
-          ...(sparklePublicEdKey ? { SUPublicEDKey: sparklePublicEdKey } : {}),
-          SUEnableInstallerLauncherService: false,
-          SUScheduledCheckInterval: 5 * 60,
-        },
-      },
+      mac: { extendInfo: {} },
     }
   }
 }

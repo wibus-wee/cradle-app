@@ -30,6 +30,7 @@ const status = {
       },
     ],
   },
+  downloadProgress: null,
   errorMessage: null,
 } satisfies DesktopUpdateStatus
 
@@ -68,6 +69,7 @@ const labels = {
   updateStatus: defaultSettings['desktop.updates.status.available'],
   currentVersion: defaultSettings['desktop.updates.currentVersion'],
   downloading: defaultSettings['desktop.updates.status.downloading'],
+  preparing: defaultSettings['desktop.updates.status.preparing'],
   availableVersion: defaultSettings['desktop.updates.availableVersion'],
   noUpdate: defaultSettings['desktop.updates.none'],
   releaseNotes: defaultSettings['desktop.updates.releaseNotes'],
@@ -151,7 +153,7 @@ export const Downloading: Story = {
       scope: 'desktop',
       owner: {
         namespace: 'desktop-update',
-        resourceType: 'macos-update',
+        resourceType: 'windows-update',
         resourceId: '1.9.0',
         displayName: 'Cradle 1.9.0',
       },
@@ -164,6 +166,58 @@ export const Downloading: Story = {
       ...capabilities,
       checkUpdate: false,
       downloadUpdate: false,
+    },
+  },
+}
+
+export const SparkleDownloading: Story = {
+  args: {
+    status: {
+      ...status,
+      provider: 'sparkle',
+      updateInfo: {
+        ...status.updateInfo!,
+        files: [],
+      },
+      downloadProgress: {
+        phase: 'download',
+        percent: 43,
+        transferred: 78_000_000,
+        total: 182_000_000,
+        fallback: false,
+      },
+    },
+    labels: {
+      ...labels,
+      updateStatus: defaultSettings['desktop.updates.status.downloading'],
+    },
+    capabilities: {
+      ...capabilities,
+      checkUpdate: false,
+      downloadUpdate: false,
+    },
+  },
+}
+
+export const SparkleDownloaded: Story = {
+  args: {
+    status: {
+      ...status,
+      provider: 'sparkle',
+      updateInfo: {
+        ...status.updateInfo!,
+        files: [],
+      },
+      updateDownloaded: true,
+    },
+    labels: {
+      ...labels,
+      updateStatus: defaultSettings['desktop.updates.status.ready'],
+    },
+    capabilities: {
+      ...capabilities,
+      downloadUpdate: false,
+      applyUpdate: true,
     },
   },
 }

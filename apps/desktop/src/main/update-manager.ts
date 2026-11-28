@@ -4,6 +4,7 @@ import { app } from 'electron'
 
 import type { DesktopDownloadCenterService } from './download-center'
 import { ElectronDesktopUpdateAdapter } from './electron-updater-adapter'
+import type { SparkleBridgeEvent } from './macos-sparkle-update-adapter'
 import { MacOSSparkleUpdateAdapter } from './macos-sparkle-update-adapter'
 import {
   readSparkleAppcastUrl,
@@ -119,6 +120,7 @@ export class DesktopUpdateManager {
       isPreparingUpdate: false,
       updateDownloaded: false,
       updateInfo: null,
+      downloadProgress: null,
       errorMessage: unsupportedReason,
     }
 
@@ -150,6 +152,10 @@ export class DesktopUpdateManager {
 
   async shutdown(): Promise<void> {
     this.stopBackgroundChecks()
+    // Release the native event callback before teardown; the N-API thread-safe
+    // function must not invoke a dead JS handler. The staged installer does not
+    // depend on the JS event handler, so quitting after this still installs.
+    this.sparkleAdapter?.setEventHandler(null)
   }
 
   on<K extends DesktopUpdateEventName>(
@@ -254,8 +260,7 @@ export class DesktopUpdateManager {
     }
 
     if (this.sparkleAdapter) {
-      this.setStatus({ errorMessage: 'Sparkle manages download and installation in its native update window' })
-      return this.statusSnapshot
+      return await this.downloadSparkleUpdate()
     }
 
     return this.statusSnapshot
@@ -267,10 +272,13 @@ export class DesktopUpdateManager {
       return
     }
 
+    if (this.sparkleAdapter) {
+      await this.applySparkleUpdate()
+      return
+    }
+
     this.setStatus({
-      errorMessage: this.sparkleAdapter
-        ? 'Sparkle manages installation in its native update window'
-        : 'No prepared desktop update is available',
+      errorMessage: 'No prepared desktop update is available',
     })
   }
 
@@ -284,6 +292,7 @@ export class DesktopUpdateManager {
       return
     }
 
+    this.sparkleAdapter!.setEventHandler(event => this.handleSparkleEvent(event))
     this.sparkleAdapter!.setAutomaticChecks(this.preferences.autoCheckForUpdates)
     this.setStatus({
       unsupported: false,
@@ -313,28 +322,176 @@ export class DesktopUpdateManager {
         throw new Error(this.sparkleAdapter!.lastInitError ?? 'Sparkle bridge is not ready')
       }
 
-      // Manual checks open Sparkle's canonical UI. Scheduled checks are owned by
-      // Sparkle through setAutomaticChecks and never mirrored into Cradle state.
-      if (!options.quiet) {
-        this.sparkleAdapter!.checkForUpdatesWithUI()
-      }
-
-      this.setStatus({
-        isCheckingForUpdates: false,
-        updateInfo: null,
-        updateDownloaded: false,
-      })
+      // The silent user driver shows no native UI and downloads every update it
+      // finds automatically. The check outcome (update-available /
+      // update-not-available / error) arrives asynchronously through the bridge
+      // event handler and clears isCheckingForUpdates there.
+      this.sparkleAdapter!.checkForUpdates()
     }
     catch (error) {
       this.setStatus({
         isCheckingForUpdates: false,
-        updateInfo: null,
-        updateDownloaded: false,
         errorMessage: options.quiet ? this.statusSnapshot.errorMessage : readErrorMessage(error),
       })
     }
 
     return this.statusSnapshot
+  }
+
+  /**
+   * The silent driver downloads every update it finds, so there is no manual
+   * download step on macOS. The one meaningful case is a previously discarded
+   * (or interrupted) download: a fresh silent check re-reads the appcast and
+   * restarts discovery plus download.
+   */
+  private async downloadSparkleUpdate(): Promise<DesktopUpdateStatus> {
+    if (this.downloadInProgress || this.statusSnapshot.updateDownloaded || !this.statusSnapshot.updateInfo) {
+      return this.statusSnapshot
+    }
+
+    this.setStatus({ errorMessage: null })
+
+    try {
+      await this.ensureSparkleReady()
+      if (!this.sparkleAdapter!.isReady) {
+        throw new Error(this.sparkleAdapter!.lastInitError ?? 'Sparkle bridge is not ready')
+      }
+      this.setStatus({ isCheckingForUpdates: true })
+      this.sparkleAdapter!.checkForUpdates()
+    }
+    catch (error) {
+      this.setStatus({
+        isCheckingForUpdates: false,
+        errorMessage: readErrorMessage(error),
+      })
+    }
+
+    return this.statusSnapshot
+  }
+
+  private async applySparkleUpdate(): Promise<void> {
+    if (!this.statusSnapshot.updateDownloaded) {
+      this.setStatus({
+        errorMessage: 'No prepared desktop update is available',
+      })
+      return
+    }
+    if (!this.prepareQuitForUpdate) {
+      this.setStatus({
+        errorMessage: 'Desktop update quit hook is not configured',
+      })
+      return
+    }
+
+    try {
+      await this.ensureSparkleReady()
+      if (!this.sparkleAdapter!.isReady) {
+        throw new Error(this.sparkleAdapter!.lastInitError ?? 'Sparkle bridge is not ready')
+      }
+      // Graceful cleanup runs first (server runtime, plugins, brokers). Then
+      // installUpdateNow hands termination and relaunch to Sparkle: it answers
+      // the pending ready-to-install reply, which terminates the app. The
+      // before-quit guard in main-app must let that quit through because
+      // shutdownPromise is already settled — app.exit() would prevent it.
+      await this.prepareQuitForUpdate()
+      this.sparkleAdapter!.installUpdateNow()
+    }
+    catch (error) {
+      this.setStatus({
+        errorMessage: readErrorMessage(error),
+      })
+    }
+  }
+
+  /**
+   * Stages the downloaded update so Sparkle installs it when the app next
+   * terminates on its own (natural quit). Called by main-app before its normal
+   * quit path so a pending update is not silently dropped.
+   */
+  installSparkleUpdateOnQuit(): void {
+    if (!this.sparkleAdapter || !this.statusSnapshot.updateDownloaded) {
+      return
+    }
+    try {
+      this.sparkleAdapter.installUpdateOnQuit()
+    }
+    catch (error) {
+      console.warn('[sparkle] install on quit failed:', error)
+    }
+  }
+
+  private handleSparkleEvent(event: SparkleBridgeEvent): void {
+    switch (event.type) {
+      case 'checking':
+        this.setStatus({
+          isCheckingForUpdates: true,
+          errorMessage: null,
+        })
+        break
+      case 'update-available':
+        // The silent driver starts downloading immediately; byte counts arrive
+        // as download-progress events. Total size is unknown until then, so
+        // files stays empty rather than faking electron-updater metadata.
+        this.setStatus({
+          isCheckingForUpdates: false,
+          updateDownloaded: false,
+          isPreparingUpdate: false,
+          updateInfo: {
+            version: event.version ?? 'unknown',
+            releaseName: event.releaseName ?? null,
+            releaseNotes: event.releaseNotes ?? null,
+            releaseDate: event.releaseDate ?? null,
+            files: [],
+          },
+          downloadProgress: null,
+          errorMessage: null,
+        })
+        break
+      case 'download-progress': {
+        const percent = event.percent ?? null
+        const phase = event.phase === 'apply' ? 'apply' : 'download'
+        this.setStatus({
+          downloadProgress: {
+            phase,
+            percent,
+            transferred: event.transferred ?? null,
+            total: event.total ?? null,
+            fallback: event.fallback === true,
+          },
+          isPreparingUpdate: phase === 'apply',
+        })
+        break
+      }
+      case 'update-downloaded':
+        // Ready to install: patches are applied and validated. Distinct from
+        // download-progress at 100%, which only means bytes arrived.
+        this.setStatus({
+          isCheckingForUpdates: false,
+          isPreparingUpdate: false,
+          downloadProgress: null,
+          updateDownloaded: true,
+        })
+        break
+      case 'update-not-available':
+        this.setStatus({
+          isCheckingForUpdates: false,
+          isPreparingUpdate: false,
+          updateInfo: null,
+          updateDownloaded: false,
+          downloadProgress: null,
+        })
+        break
+      case 'error':
+        // Keep updateInfo so the user can retry the download; the transport
+        // state (progress/downloading) is cleared since the session aborted.
+        this.setStatus({
+          isCheckingForUpdates: false,
+          isPreparingUpdate: false,
+          downloadProgress: null,
+          errorMessage: event.message ?? 'Sparkle update failed',
+        })
+        break
+    }
   }
 
   private setStatus(patch: Partial<DesktopUpdateStatus>): void {
