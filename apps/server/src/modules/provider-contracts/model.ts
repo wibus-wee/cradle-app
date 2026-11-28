@@ -22,6 +22,11 @@ export const modelCapabilitiesSchema = t.Object({
   outputModalities: t.Optional(t.Array(t.String())),
   reasoning: t.Optional(t.Boolean()),
   reasoningEfforts: t.Optional(t.Array(reasoningEffortSchema)),
+  serviceTiers: t.Optional(t.Array(t.Object({
+    id: t.String(),
+    name: t.String(),
+    description: t.Optional(t.String()),
+  }))),
   toolCall: t.Optional(t.Boolean()),
   temperature: t.Optional(t.Boolean()),
   structuredOutput: t.Optional(t.Boolean()),

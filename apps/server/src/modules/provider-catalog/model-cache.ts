@@ -5,10 +5,10 @@ import { z } from 'zod'
 import { db } from '../../infra'
 import { getLogger } from '../../logging/logger'
 import {
-  clearAllProviderTargetContextWindows,
-  clearProviderTargetContextWindows,
-  replaceProviderTargetContextWindows,
-} from '../model-registry/provider-target-context-windows'
+  clearAllProviderTargetModelFacts,
+  clearProviderTargetModelFacts,
+  replaceProviderTargetModelFacts,
+} from '../model-registry/provider-target-model-facts'
 import type { ModelCapabilities, ModelDescriptor } from '../provider-contracts/types'
 import type { ProviderTarget } from '../provider-targets/service'
 import { providerTargetCacheId } from '../provider-targets/service'
@@ -37,6 +37,11 @@ const ModelCapabilitiesSchema = z.object({
   outputModalities: z.array(z.string()).optional(),
   reasoning: z.boolean().optional(),
   reasoningEfforts: z.array(z.enum(['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra'])).optional(),
+  serviceTiers: z.array(z.object({
+    id: z.string(),
+    name: z.string(),
+    description: z.string().optional(),
+  })).optional(),
   toolCall: z.boolean().optional(),
   temperature: z.boolean().optional(),
   structuredOutput: z.boolean().optional(),
@@ -129,8 +134,9 @@ export function setCachedModelsForTarget(target: ProviderTarget, models: ModelDe
       },
     }).run()
     // Persist and publish together: a run must compact against the window this
-    // listing just declared, without re-reading SQLite on the first-token path.
-    replaceProviderTargetContextWindows(providerTargetId, inventoryModels)
+    // listing just declared, and may only request a tier it declared, without
+    // re-reading SQLite on the first-token path.
+    replaceProviderTargetModelFacts(providerTargetId, inventoryModels)
     clearCachedModelRefreshFailure(target)
   }
   catch (err: any) {
@@ -172,26 +178,27 @@ export function clearCachedModelRefreshFailure(target: ProviderTarget): void {
 export function deleteCachedModelsForTarget(target: ProviderTarget): void {
   const providerTargetId = providerTargetCacheId(target)
   db().delete(providerTargetModelCache).where(eq(providerTargetModelCache.providerTargetId, providerTargetId)).run()
-  clearProviderTargetContextWindows(providerTargetId)
+  clearProviderTargetModelFacts(providerTargetId)
 }
 
 /**
- * Republish every target's declared context windows from the persisted
- * inventory. Boot calls this after listen, so the first turn of a restarted
- * server compacts against the window each target declared last time it was
- * listed instead of falling back to the models.dev guess or 128k.
+ * Republish every target's declared model facts from the persisted inventory.
+ * Boot calls this after listen, so the first turn of a restarted server compacts
+ * against the window each target declared last time it was listed instead of
+ * falling back to the models.dev guess or 128k, and refuses a tier that target
+ * never declared.
  *
  * Tolerates a row whose JSON predates the current descriptor shape: a real read
  * of that target surfaces the parse error with its target identity attached.
  */
-export function warmupProviderTargetContextWindows(): void {
+export function warmupProviderTargetModelFacts(): void {
   const logger = getLogger()
   try {
-    clearAllProviderTargetContextWindows()
+    clearAllProviderTargetModelFacts()
     const rows = db().select().from(providerTargetModelCache).all()
     for (const row of rows) {
       try {
-        replaceProviderTargetContextWindows(
+        replaceProviderTargetModelFacts(
           row.providerTargetId,
           CachedModelsJsonSchema.parse(row.modelsJson),
         )
@@ -205,15 +212,15 @@ export function warmupProviderTargetContextWindows(): void {
     }
   }
   catch (error) {
-    logger.warn('Provider target context window warmup failed', {
+    logger.warn('Provider target model facts warmup failed', {
       error: error instanceof Error ? error.message : String(error),
     })
   }
 }
 
 /** Run the warmup off the boot critical path. */
-export function scheduleProviderTargetContextWindowWarmup(): void {
-  setTimeout(warmupProviderTargetContextWindows, 10_000).unref()
+export function scheduleProviderTargetModelFactsWarmup(): void {
+  setTimeout(warmupProviderTargetModelFacts, 10_000).unref()
 }
 
 export function isCacheStale(fetchedAt: number): boolean {

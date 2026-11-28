@@ -119,7 +119,7 @@ async function bootstrap() {
     { createServerApp },
     { loadServerConfig },
     { warmupModelsDevCache },
-    { scheduleProviderTargetContextWindowWarmup },
+    { scheduleProviderTargetModelFactsWarmup },
   ] = await Promise.all([
     import('./app'),
     import('./config/server-config'),
@@ -149,8 +149,8 @@ async function bootstrap() {
         logger.info(`listening on http://${config.host}:${config.port}`)
         // Force-refresh models.dev catalog on boot (SWR soft/hard TTL applies afterward)
         warmupModelsDevCache()
-        // Republish provider-declared context windows off the boot critical path
-        scheduleProviderTargetContextWindowWarmup()
+        // Republish provider-declared model facts off the boot critical path
+        scheduleProviderTargetModelFactsWarmup()
       },
     )
   }

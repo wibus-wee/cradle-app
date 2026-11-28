@@ -23,6 +23,7 @@ const engineMocks = vi.hoisted(() => ({
   detectApiFormat: vi.fn(() => 'openai'),
   getCachedContextWindow: vi.fn((): number | null => 32_000),
   getProviderTargetContextWindow: vi.fn((_targetId: string | null | undefined, _modelId: string) => null as number | null),
+  getProviderTargetServiceTierIds: vi.fn((_targetId: string | null | undefined, _modelId: string) => [] as string[]),
 }))
 
 vi.mock('../../chat-runtime-engine/ai-sdk-engine', async (importOriginal) => {
@@ -51,11 +52,12 @@ vi.mock('../../model-registry/model-info-registry', async (importOriginal) => {
   }
 })
 
-vi.mock('../../model-registry/provider-target-context-windows', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../model-registry/provider-target-context-windows')>()
+vi.mock('../../model-registry/provider-target-model-facts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../model-registry/provider-target-model-facts')>()
   return {
     ...actual,
     getProviderTargetContextWindow: engineMocks.getProviderTargetContextWindow,
+    getProviderTargetServiceTierIds: engineMocks.getProviderTargetServiceTierIds,
   }
 })
 
@@ -63,6 +65,7 @@ describe('openai compatible provider', () => {
   afterEach(() => {
     vi.clearAllMocks()
     engineMocks.getProviderTargetContextWindow.mockReturnValue(null)
+    engineMocks.getProviderTargetServiceTierIds.mockReturnValue([])
     engineMocks.executeAiSdkTurn.mockImplementation(async function* (_input: AiSdkEngineInput) {
       yield { type: 'text-start', id: 'text-1' }
       yield { type: 'text-delta', id: 'text-1', delta: 'Standard answer' }
@@ -160,6 +163,49 @@ describe('openai compatible provider', () => {
     }
     expect(engineMocks.executeAiSdkTurn).toHaveBeenLastCalledWith(expect.objectContaining({
       contextWindow: 128_000,
+    }))
+  })
+
+  it('forwards a service tier only when the target declared it for the model', async () => {
+    engineMocks.getProviderTargetServiceTierIds.mockReturnValue(['priority'])
+    const provider = new OpenAICompatibleProvider(createProviderContext())
+
+    for await (const _chunk of provider.streamTurn({
+      runId: 'run-standard',
+      runtimeSession: createRuntimeSession(),
+      profile: createProfile(),
+      message: createUserMessage('Hello standard'),
+      workspaceId: 'workspace-1',
+      workspacePath: '/tmp/workspace',
+      providerOptions: { runtimeSettings: { serviceTier: 'priority' } },
+    })) {
+      // drain
+    }
+
+    expect(engineMocks.getProviderTargetServiceTierIds).toHaveBeenCalledWith('profile-standard', 'gpt-test')
+    expect(engineMocks.executeAiSdkTurn).toHaveBeenCalledWith(expect.objectContaining({
+      serviceTier: 'priority',
+    }))
+  })
+
+  it('drops a tier the target never declared, e.g. left over from another model', async () => {
+    engineMocks.getProviderTargetServiceTierIds.mockReturnValue([])
+    const provider = new OpenAICompatibleProvider(createProviderContext())
+
+    for await (const _chunk of provider.streamTurn({
+      runId: 'run-standard',
+      runtimeSession: createRuntimeSession(),
+      profile: createProfile(),
+      message: createUserMessage('Hello standard'),
+      workspaceId: 'workspace-1',
+      workspacePath: '/tmp/workspace',
+      providerOptions: { runtimeSettings: { serviceTier: 'priority' } },
+    })) {
+      // drain
+    }
+
+    expect(engineMocks.executeAiSdkTurn).toHaveBeenCalledWith(expect.objectContaining({
+      serviceTier: undefined,
     }))
   })
 

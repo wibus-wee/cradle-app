@@ -7,16 +7,17 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import { db, shutdownInfra } from '../../infra'
 import {
-  clearAllProviderTargetContextWindows,
+  clearAllProviderTargetModelFacts,
   getProviderTargetContextWindow,
-} from '../model-registry/provider-target-context-windows'
+  getProviderTargetServiceTierIds,
+} from '../model-registry/provider-target-model-facts'
 import {
   clearCachedModelRefreshFailure,
   deleteCachedModelsForTarget,
   getCachedModelRefreshFailure,
   setCachedModelRefreshFailure,
   setCachedModelsForTarget,
-  warmupProviderTargetContextWindows,
+  warmupProviderTargetModelFacts,
 } from './model-cache'
 
 const target = { kind: 'manual' as const, id: 'negative-cache-test-target' }
@@ -48,7 +49,10 @@ describe('provider target context windows', () => {
         id: 'codex/gpt-6.2-sol',
         label: 'GPT-6.2-Sol',
         providerKind: 'openai-compatible' as const,
-        capabilities: { contextWindow },
+        capabilities: {
+          contextWindow,
+          serviceTiers: [{ id: 'priority', name: 'Fast', description: 'Increased usage' }],
+        },
       })
 
       setCachedModelsForTarget({ kind: 'manual', id: 'target-a' }, [sol(500_000)])
@@ -59,15 +63,18 @@ describe('provider target context windows', () => {
       expect(getProviderTargetContextWindow('target-b', 'codex/gpt-6.2-sol')).toBe(200_000)
 
       // A restart drops memory; the boot warmup restores it from the cache rows.
-      clearAllProviderTargetContextWindows()
+      clearAllProviderTargetModelFacts()
       expect(getProviderTargetContextWindow('target-a', 'codex/gpt-6.2-sol')).toBeNull()
-      warmupProviderTargetContextWindows()
+      warmupProviderTargetModelFacts()
       expect(getProviderTargetContextWindow('target-a', 'codex/gpt-6.2-sol')).toBe(500_000)
       expect(getProviderTargetContextWindow('target-b', 'codex/gpt-6.2-sol')).toBe(200_000)
+      expect(getProviderTargetServiceTierIds('target-a', 'codex/gpt-6.2-sol')).toEqual(['priority'])
+      expect(getProviderTargetServiceTierIds('target-b', 'codex/gpt-6.2-sol')).toEqual(['priority'])
 
-      // Deleting the inventory drops the target's windows again.
+      // Deleting the inventory drops the target's facts again.
       deleteCachedModelsForTarget({ kind: 'manual', id: 'target-a' })
       expect(getProviderTargetContextWindow('target-a', 'codex/gpt-6.2-sol')).toBeNull()
+      expect(getProviderTargetServiceTierIds('target-a', 'codex/gpt-6.2-sol')).toEqual([])
       expect(getProviderTargetContextWindow('target-b', 'codex/gpt-6.2-sol')).toBe(200_000)
     })
   })

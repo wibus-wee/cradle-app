@@ -409,6 +409,11 @@ export const zPatchProfilesByIdCustomModelsBody = z.object({
                 'max',
                 'ultra'
             ])).optional(),
+            serviceTiers: z.array(z.object({
+                id: z.string(),
+                name: z.string(),
+                description: z.string().optional()
+            })).optional(),
             toolCall: z.boolean().optional(),
             temperature: z.boolean().optional(),
             structuredOutput: z.boolean().optional(),

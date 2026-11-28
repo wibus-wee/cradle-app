@@ -108,7 +108,11 @@ describe('providerCatalog', () => {
             // Catalog-only fields Cradle does not model must not fail the parse.
             pricing: { prompt: '0.000002', completion: '0.00001' },
             native_endpoints: ['/v1/responses'],
-            service_tiers: [{ id: 'priority', name: 'Fast' }],
+            service_tiers: [
+              { id: 'priority', name: 'Fast', description: '1.5x speed, increased usage' },
+              // Not a value the OpenAI-compatible wire can request, so it is not advertised.
+              { id: 'ultrafast', name: 'Ultrafast' },
+            ],
           },
           {
             id: 'bare/model',
@@ -146,6 +150,7 @@ describe('providerCatalog', () => {
           reasoning: true,
           // Declared values survive in order, unknown efforts are dropped.
           reasoningEfforts: ['low', 'high'],
+          serviceTiers: [{ id: 'priority', name: 'Fast', description: '1.5x speed, increased usage' }],
           toolCall: true,
         },
       },

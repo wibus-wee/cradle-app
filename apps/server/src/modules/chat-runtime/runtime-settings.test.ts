@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { getDefaultRuntimeSettings, resolveRunRuntimeSettings } from './runtime-settings'
+import {
+  getDefaultRuntimeSettings,
+  mergeRuntimeSettings,
+  normalizeRuntimeSettingsPatch,
+  resolveRunRuntimeSettings,
+} from './runtime-settings'
 
 describe('resolveRunRuntimeSettings', () => {
   const runtimeKind = 'codex'
@@ -45,6 +50,40 @@ describe('resolveRunRuntimeSettings', () => {
     )).toEqual({
       accessMode: 'approval-required',
       interactionMode: 'default',
+    })
+  })
+})
+
+describe('standard runtime service tier settings', () => {
+  const runtimeKind = 'standard'
+
+  it('accepts a tier the selected model declared', () => {
+    expect(normalizeRuntimeSettingsPatch(runtimeKind, { serviceTier: 'priority' })).toEqual({
+      serviceTier: 'priority',
+    })
+    expect(resolveRunRuntimeSettings(runtimeKind, {}, { serviceTier: 'priority' })).toEqual({
+      serviceTier: 'priority',
+    })
+  })
+
+  it('does not wipe a chosen tier when the request names none', () => {
+    expect(resolveRunRuntimeSettings(runtimeKind, { serviceTier: 'priority' }, {})).toEqual({
+      serviceTier: 'priority',
+    })
+  })
+
+  it('clears a tier on an explicit empty value, because the patch channel has no delete', () => {
+    expect(normalizeRuntimeSettingsPatch(runtimeKind, { serviceTier: '' })).toEqual({
+      serviceTier: '',
+    })
+    expect(mergeRuntimeSettings(runtimeKind, { serviceTier: 'priority' }, { serviceTier: '' })).toEqual({})
+  })
+
+  it('drops tiers that are not strings and absurdly long values', () => {
+    expect(normalizeRuntimeSettingsPatch(runtimeKind, { serviceTier: 42 })).toEqual({})
+    expect(normalizeRuntimeSettingsPatch(runtimeKind, { serviceTier: 'x'.repeat(65) })).toEqual({})
+    expect(normalizeRuntimeSettingsPatch(runtimeKind, { serviceTier: '  priority  ' })).toEqual({
+      serviceTier: 'priority',
     })
   })
 })

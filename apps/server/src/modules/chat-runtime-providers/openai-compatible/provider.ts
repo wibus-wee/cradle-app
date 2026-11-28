@@ -7,6 +7,7 @@ import type {
   ProviderContext,
   ResumeChatSessionInput,
   RuntimeSession,
+  RuntimeSettings,
   RuntimeStepUsage,
   StartChatSessionInput,
   StreamTurnInput,
@@ -20,7 +21,10 @@ import type { TokenUsage } from '../../chat-runtime-engine/ai-sdk-engine'
 import { buildModelMessages, executeAiSdkTurn } from '../../chat-runtime-engine/ai-sdk-engine'
 import { createLanguageModel, detectApiFormat } from '../../chat-runtime-engine/providers'
 import { getCachedContextWindow } from '../../model-registry/model-info-registry'
-import { getProviderTargetContextWindow } from '../../model-registry/provider-target-context-windows'
+import {
+  getProviderTargetContextWindow,
+  getProviderTargetServiceTierIds,
+} from '../../model-registry/provider-target-model-facts'
 import { readTrustedOpenAICompatibleConfig, readTrustedUniversalConfig } from '../../provider-contracts/provider-base'
 import { readProviderStateSnapshot } from '../kit/state-snapshot'
 import {
@@ -129,6 +133,14 @@ export class OpenAICompatibleProvider implements ChatRuntime {
         ?? getCachedContextWindow(effectiveModel)
         ?? 128_000
 
+      // Session settings survive a model switch, so a tier chosen for the previous
+      // model must not reach a gateway that never declared it for this one.
+      const serviceTier = readRequestedServiceTier(
+        input.providerOptions?.runtimeSettings,
+        profile.providerTargetId,
+        effectiveModel,
+      )
+
       yield* executeAiSdkTurn({
         model,
         messages,
@@ -143,6 +155,7 @@ export class OpenAICompatibleProvider implements ChatRuntime {
         onUsage: (usage) => { turnUsage = usage },
         onStepFinish: (step) => { turnStepUsages.push(step) },
         contextWindow,
+        serviceTier,
         chatSessionId: runtimeSession.chatSessionId,
       })
     }
@@ -181,6 +194,24 @@ interface ResolvedOpenAICompatibleEndpoint {
   model: string | null
   maxMessages: number
   apiMode?: 'responses' | 'chat-completions'
+}
+
+/**
+ * A requested tier is only forwarded when this target declared it for the model
+ * being served; anything else is dropped rather than sent upstream.
+ */
+function readRequestedServiceTier(
+  settings: RuntimeSettings | null | undefined,
+  providerTargetId: string,
+  modelId: string,
+): string | undefined {
+  const requested = typeof settings?.serviceTier === 'string' ? settings.serviceTier.trim() : ''
+  if (!requested) {
+    return undefined
+  }
+  return getProviderTargetServiceTierIds(providerTargetId, modelId).includes(requested)
+    ? requested
+    : undefined
 }
 
 function resolveOpenAICompatibleEndpoint(

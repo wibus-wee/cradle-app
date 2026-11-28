@@ -2156,6 +2156,11 @@ export type PatchProfilesByIdCustomModelsData = {
                 outputModalities?: Array<string>;
                 reasoning?: boolean;
                 reasoningEfforts?: Array<'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra'>;
+                serviceTiers?: Array<{
+                    id: string;
+                    name: string;
+                    description?: string;
+                }>;
                 toolCall?: boolean;
                 temperature?: boolean;
                 structuredOutput?: boolean;
@@ -2195,6 +2200,11 @@ export type PatchProfilesByIdCustomModelsResponses = {
             outputModalities?: Array<string>;
             reasoning?: boolean;
             reasoningEfforts?: Array<'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra'>;
+            serviceTiers?: Array<{
+                id: string;
+                name: string;
+                description?: string;
+            }>;
             toolCall?: boolean;
             temperature?: boolean;
             structuredOutput?: boolean;
@@ -2753,6 +2763,11 @@ export type PatchProviderTargetsByProviderTargetIdCustomModelsResponses = {
             outputModalities?: Array<string>;
             reasoning?: boolean;
             reasoningEfforts?: Array<'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra'>;
+            serviceTiers?: Array<{
+                id: string;
+                name: string;
+                description?: string;
+            }>;
             toolCall?: boolean;
             temperature?: boolean;
             structuredOutput?: boolean;
@@ -4943,6 +4958,11 @@ export type PostProvidersModelsResponses = {
             outputModalities?: Array<string>;
             reasoning?: boolean;
             reasoningEfforts?: Array<'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra'>;
+            serviceTiers?: Array<{
+                id: string;
+                name: string;
+                description?: string;
+            }>;
             toolCall?: boolean;
             temperature?: boolean;
             structuredOutput?: boolean;
@@ -4989,6 +5009,11 @@ export type GetProvidersTargetsByProviderTargetIdModelsCacheResponses = {
                 outputModalities?: Array<string>;
                 reasoning?: boolean;
                 reasoningEfforts?: Array<'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra'>;
+                serviceTiers?: Array<{
+                    id: string;
+                    name: string;
+                    description?: string;
+                }>;
                 toolCall?: boolean;
                 temperature?: boolean;
                 structuredOutput?: boolean;
@@ -5040,6 +5065,11 @@ export type GetProvidersByProfileIdModelsCacheResponses = {
                 outputModalities?: Array<string>;
                 reasoning?: boolean;
                 reasoningEfforts?: Array<'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra'>;
+                serviceTiers?: Array<{
+                    id: string;
+                    name: string;
+                    description?: string;
+                }>;
                 toolCall?: boolean;
                 temperature?: boolean;
                 structuredOutput?: boolean;
@@ -5088,6 +5118,11 @@ export type PostProvidersModelLookupResponses = {
             outputModalities?: Array<string>;
             reasoning?: boolean;
             reasoningEfforts?: Array<'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra'>;
+            serviceTiers?: Array<{
+                id: string;
+                name: string;
+                description?: string;
+            }>;
             toolCall?: boolean;
             temperature?: boolean;
             structuredOutput?: boolean;
@@ -5132,6 +5167,11 @@ export type PostProvidersModelSearchResponses = {
             outputModalities?: Array<string>;
             reasoning?: boolean;
             reasoningEfforts?: Array<'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra'>;
+            serviceTiers?: Array<{
+                id: string;
+                name: string;
+                description?: string;
+            }>;
             toolCall?: boolean;
             temperature?: boolean;
             structuredOutput?: boolean;

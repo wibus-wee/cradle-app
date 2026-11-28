@@ -21,6 +21,7 @@ import {
 import type {
   ModelCapabilities,
   ModelDescriptor,
+  ModelServiceTier,
   ProviderKind,
   ProviderRequest,
 } from '../provider-contracts/types'
@@ -67,6 +68,11 @@ const OpenAICompatibleModelSchema = z.object({
   reasoning: z.boolean().optional(),
   reasoning_levels: z.array(z.string()).optional(),
   supported_reasoning_levels: z.array(z.object({ effort: z.string().optional() })).optional(),
+  service_tiers: z.array(z.object({
+    id: z.string(),
+    name: z.string().optional(),
+    description: z.string().optional(),
+  })).optional(),
   tool_call: z.boolean().optional(),
 })
 
@@ -336,6 +342,10 @@ function readOpenAiCompatibleModelCapabilities(
   if (reasoningEfforts.length > 0) {
     capabilities.reasoningEfforts = reasoningEfforts
   }
+  const serviceTiers = readDeclaredServiceTiers(model)
+  if (serviceTiers.length > 0) {
+    capabilities.serviceTiers = serviceTiers
+  }
   if (model.tool_call !== undefined) {
     capabilities.toolCall = model.tool_call
   }
@@ -367,6 +377,34 @@ function readDeclaredReasoningEfforts(
     efforts.push(effort)
   }
   return efforts
+}
+
+/**
+ * Service tiers the OpenAI-compatible wire can actually request. The AI SDK's
+ * `@ai-sdk/openai` provider option accepts exactly this set, so a gateway tier
+ * outside it cannot be sent from Cradle; advertising it would put a control in
+ * the picker that silently does nothing. Declared tiers are filtered to what a
+ * run can request, and the rest stay visible only in the gateway.
+ */
+const OPENAI_COMPATIBLE_WIRE_SERVICE_TIERS = new Set(['auto', 'flex', 'priority', 'default'])
+
+/**
+ * Service tiers are sent back to the gateway verbatim, so the declared id is the
+ * wire value. A tier without a name still needs one for a picker: fall back to
+ * the id instead of inventing a label.
+ */
+function readDeclaredServiceTiers(model: OpenAICompatibleModel): ModelServiceTier[] {
+  const tiers: ModelServiceTier[] = []
+  for (const tier of model.service_tiers ?? []) {
+    const id = tier.id.trim()
+    if (!id || !OPENAI_COMPATIBLE_WIRE_SERVICE_TIERS.has(id) || tiers.some(existing => existing.id === id)) {
+      continue
+    }
+    const name = tier.name?.trim() || id
+    const description = tier.description?.trim()
+    tiers.push(description ? { id, name, description } : { id, name })
+  }
+  return tiers
 }
 
 function isOpenAiCompatibleReasoningEffort(

@@ -84,6 +84,20 @@ const CODEX_DEFAULTS: RuntimeSettings = {
   interactionMode: 'default',
 }
 
+/**
+ * The standard (OpenAI-compatible) runtime serves gateways whose service tiers
+ * are declared per model, so a tier cannot be a runtime-level enum: the composer
+ * offers exactly the tiers the selected model declares. Nothing is advertised in
+ * the schema, which keeps schema-driven settings forms free of a control that
+ * would be empty for providers without tiers.
+ */
+const STANDARD_RUNTIME_SETTINGS_SCHEMA: RuntimeSettingsSchemaLike = {
+  type: 'object',
+  properties: {},
+}
+
+const STANDARD_SERVICE_TIER_MAX_LENGTH = 64
+
 function readStringEnum<T extends readonly string[]>(
   value: unknown,
   allowed: T,
@@ -143,6 +157,50 @@ function createProductSettingsEntry(input: {
 }
 
 const RUNTIME_SETTINGS_REGISTRY: Partial<Record<RuntimeKind, RuntimeSettingsRegistryEntry>> = {
+  'standard': {
+    schema: STANDARD_RUNTIME_SETTINGS_SCHEMA,
+    defaults: {},
+    normalize(value) {
+      const record = value && typeof value === 'object' && !Array.isArray(value)
+        ? value as Record<string, unknown>
+        : {}
+      if (typeof record.serviceTier !== 'string') {
+        return {}
+      }
+      const serviceTier = record.serviceTier.trim()
+      // An explicit empty value clears a tier chosen for an earlier model; the
+      // patch channel has no delete, so clearing travels as ''.
+      if (!serviceTier) {
+        return { serviceTier: '' }
+      }
+      return serviceTier.length <= STANDARD_SERVICE_TIER_MAX_LENGTH
+        ? { serviceTier }
+        : {}
+    },
+    merge(base, patch) {
+      const next = { ...base }
+      if (typeof patch?.serviceTier === 'string') {
+        if (patch.serviceTier) {
+          next.serviceTier = patch.serviceTier
+        }
+        else {
+          delete next.serviceTier
+        }
+      }
+      return next
+    },
+    equals(left, right) {
+      return (left.serviceTier ?? '') === (right.serviceTier ?? '')
+    },
+    isStaleDefaultPatch(patch, sessionSettings) {
+      // A patch that names no tier must not wipe a tier the session already has;
+      // clearing is always explicit ('').
+      const patchHasTier = typeof patch.serviceTier === 'string'
+      const sessionHasTier = typeof sessionSettings.serviceTier === 'string'
+        && sessionSettings.serviceTier !== ''
+      return !patchHasTier && sessionHasTier
+    },
+  },
   'claude-agent': createProductSettingsEntry({
     schema: CLAUDE_AGENT_SETTINGS_SCHEMA,
     defaults: CLAUDE_AGENT_DEFAULTS,
